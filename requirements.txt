@@ -1,0 +1,23 @@
+ipywidgets
+ipykernel
+pymc==5.11.0
+
+# pip packages
+jax[cuda12]==0.5.0
+jaxlib==0.5.0
+papermill
+numpyro
+dill
+corner
+arviz
+matplotlib
+numpy<2.0.0
+scipy
+pandas
+tqdm
+POT
+git+https://github.com/pymc-devs/pymc-experimental.git@v0.0.18
+# git+https://github.com/skorch-dev/skorch.git@fd86afb877371dc7b702d9e9582dcb028c9afa4a  # Needed for pickling, we can remove this when skorch is updated
+hssm
+-e .[all]
+-e ./BayesFlow

@@ -1,0 +1,10 @@
+name: abw_review
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - ipykernel
+  - ipywidgets
+  - pip
+
+

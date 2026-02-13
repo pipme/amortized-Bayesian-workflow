@@ -1,0 +1,14 @@
+task_name: GEV
+use_train_dataset: false
+test_dataset_name: test_dataset_chunk_1
+smoke_test: false
+overwrite_stats: false
+dynamic_logp: true
+pymc_source: pymc_runs
+target_num_draws: 2000
+chees_hmc:
+  init_option: abi_psis
+  num_warmup: 200
+  num_superchains: 16
+  num_subchains_per_superchain: 128
+  init_step_size: 0.1
