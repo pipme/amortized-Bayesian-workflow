@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amortized-bayesian-workflow"
+version = "0.1.0"
+description = "User-friendly implementation of the Amortized Bayesian Workflow"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Project contributors" }]
+dependencies = [
+  "arviz-stats>=0.8.0",
+  "jax>=0.4.20",
+  "numpy>=1.26",
+  "packaging>=23.0",
+]
+
+[project.optional-dependencies]
+bayesflow = [
+  "bayesflow>=2.0.8,<3",
+]
+blackjax = [
+  "blackjax>=1.2.0",
+]
+tfp = [
+  "tensorflow-probability[jax]>=0.24",
+]
+pymc = [
+  "pymc>=5.10",
+  "arviz>=0.16",
+]
+dev = [
+  "pytest>=8",
+  "ruff>=0.6",
+  "mypy>=1.8",
+]
+all = [
+  "amortized-bayesian-workflow[bayesflow,blackjax,tfp,pymc,dev]",
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"amortized_bayesian_workflow.tasks.examples" = ["info/BernoulliGLM/*.npy", "info/psychometric_curve/*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
