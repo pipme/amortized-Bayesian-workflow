@@ -46,7 +46,7 @@ class MahalanobisOODResult:
 
 
 class MahalanobisReference:
-    """Minimal Mahalanobis reference fitted on training summaries.
+    """Mahalanobis distance reference fitted on training summaries.
 
     This follows the simple workflow used in the reference notebook:
     1) fit covariance on training summaries,

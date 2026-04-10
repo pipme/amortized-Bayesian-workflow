@@ -18,27 +18,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-bayesflow = [
-  "bayesflow>=2.0.8,<3",
-]
-blackjax = [
-  "blackjax>=1.2.0",
-]
-tfp = [
-  "tensorflow-probability[jax]>=0.24",
-]
-pymc = [
-  "pymc>=5.10",
-  "arviz>=0.16",
-]
-dev = [
-  "pytest>=8",
-  "ruff>=0.6",
-  "mypy>=1.8",
-]
-all = [
-  "amortized-bayesian-workflow[bayesflow,blackjax,tfp,pymc,dev]",
-]
+bayesflow = ["bayesflow>=2.0.10"]
+blackjax = ["blackjax>=1.2.0"]
+tfp = ["tensorflow-probability[jax]>=0.24"]
+pymc = ["pymc>=5.10", "arviz>=0.16"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.8"]
+all = ["amortized-bayesian-workflow[bayesflow,blackjax,tfp,pymc,dev]"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -47,7 +32,10 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-"amortized_bayesian_workflow.tasks.examples" = ["info/BernoulliGLM/*.npy", "info/psychometric_curve/*.csv"]
+"amortized_bayesian_workflow.tasks.examples" = [
+  "info/BernoulliGLM/*.npy",
+  "info/psychometric_curve/*.csv",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

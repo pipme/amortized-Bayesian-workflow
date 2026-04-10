@@ -23,9 +23,11 @@ from scipy.special import erf
 
 from amortized_bayesian_workflow.utils import read_from_file, save_to_file
 
+from .base import TaskMetadata
 from .pymc_utils import (
     _infer_value_var_dims_from_initial_point,
     get_pymc_free_RVs_names,
+    get_task_func,
     ndarray_values_as_dict,
 )
 from .pymc_utils import (
@@ -79,6 +81,14 @@ class PyMCTask(ABC):
         )
 
         self.task_name = task_name or self.__class__.__name__
+
+    @property
+    def metadata(self) -> TaskMetadata:
+        return TaskMetadata(
+            name=self.task_name,
+            parameter_names=tuple(self.var_names),
+            parameter_dims=dict(self.var_dims),
+        )
 
     @property
     def prior(self):
@@ -183,6 +193,26 @@ class PyMCTask(ABC):
         """Transform the constrained parameter values to the unconstrained space (PyMC's value variables)."""
         return _transform_to_unconstrained_space(
             var_values, self.var_dims, self.pymc_model, in_place=in_place
+        )
+
+    def vectorized_log_posterior_fn(self, observation: np.ndarray):
+        """Return a batched log-posterior function for the given observation."""
+        return get_task_func(
+            task=self,
+            func_type="posterior",
+            observation=observation,
+            static=True,
+            vmap=True,
+        )
+
+    def single_log_posterior_fn(self, observation: np.ndarray):
+        """Return a single-sample log-posterior function for the given observation."""
+        return get_task_func(
+            task=self,
+            func_type="posterior",
+            observation=observation,
+            static=True,
+            vmap=False,
         )
 
     def axis_names_for_corner_plot(self, value_var=True):

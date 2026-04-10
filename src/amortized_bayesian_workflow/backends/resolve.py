@@ -5,12 +5,15 @@ from typing import Callable, Mapping
 
 from .base import SamplerBackend
 
-
 BackendFactory = Callable[[], SamplerBackend]
 
 
 def _default_backend_factories() -> dict[str, BackendFactory]:
     return {
+        "blackjax_chees_hmc": lambda: getattr(
+            import_module(".blackjax_chees_hmc", __package__),
+            "BlackJAXCheesHMCBackend",
+        )(),
         "blackjax_nuts": lambda: getattr(
             import_module(".blackjax_nuts", __package__),
             "BlackJAXNUTSBackend",

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import numpy as np
-
 from bayesflow import ContinuousApproximator
 
 from .base import AmortizedDraws
@@ -14,14 +13,14 @@ from .base import AmortizedDraws
 
 @dataclass
 class BayesFlowAmortizedPosterior:
-    """Adapter between a trained BayesFlow ContinuousApproximator and the
+    """Thin wrapper between a trained BayesFlow ContinuousApproximator and the
     ABW inference runner.
 
     Delegates to BayesFlow's high-level `sample`, `log_prob`, and `summarize`
     methods, which correctly handle the full adapter + summary network pipeline
     and the change-of-variables term from standardization. Samples and log
-    probabilities are returned in the original (unconstrained) parameter space,
-    consistent with what the task's log posterior expects.
+    probabilities are returned in the parameter space
+    which is consistent with what the task's log posterior expects.
     """
 
     approximator: ContinuousApproximator
@@ -45,13 +44,8 @@ class BayesFlowAmortizedPosterior:
     def summary_statistics(self, observations: np.ndarray) -> np.ndarray:
         """Combined inference conditions used for Mahalanobis OOD diagnostics.
 
-        Produces the full feature vector that feeds the inference network:
-        adapter-produced inference_conditions concatenated with summary network
-        output. Uses `_prepare_data` internally so that standardization layers
-        are applied consistently with `sample` and `log_prob`, meaning the OOD
-        check operates in the same feature space as the inference network.
-        Falls back to flattened raw observations when neither inference_conditions
-        nor a summary network is present.
+        Produces the full feature vector that feeds the inference network,
+        meaning the OOD check operates in the same feature space as the inference network.
         """
         import keras
 
@@ -59,31 +53,31 @@ class BayesFlowAmortizedPosterior:
         if obs.ndim == 1:
             obs = obs[None, ...]
 
-        # _prepare_data applies the adapter AND standardization layers, giving
-        # us tensors in the same space the inference network operates on.
-        data = self.approximator._prepare_data({self.observable_key: obs})
-        summary_variables = data.get("summary_variables")
-        inference_conditions = data.get("inference_conditions")
+        resolved_conditions, adapted, summary_outputs = (
+            self.approximator._prepare_conditions({self.observable_key: obs})
+        )
+        # summary_variables = data.get("summary_variables")
+        # inference_conditions = data.get("inference_conditions")
 
-        if self.approximator.summary_network is not None:
-            if summary_variables is None:
-                raise ValueError(
-                    "BayesFlow adapter did not produce summary_variables."
-                )
-            summary_outputs = self.approximator.summary_network(
-                summary_variables
-            )
-            if inference_conditions is None:
-                inference_conditions = summary_outputs
-            else:
-                inference_conditions = keras.ops.concatenate(
-                    [inference_conditions, summary_outputs], axis=-1
-                )
+        # if self.approximator.summary_network is not None:
+        #     if summary_variables is None:
+        #         raise ValueError(
+        #             "BayesFlow adapter did not produce summary_variables."
+        #         )
+        #     summary_outputs = self.approximator.summary_network(
+        #         summary_variables
+        #     )
+        #     if inference_conditions is None:
+        #         inference_conditions = summary_outputs
+        #     else:
+        #         inference_conditions = keras.ops.concatenate(
+        #             [inference_conditions, summary_outputs], axis=-1
+        #         )
 
-        if inference_conditions is None:
-            return obs.reshape(obs.shape[0], -1)
+        # if inference_conditions is None:
+        #     return obs.reshape(obs.shape[0], -1)
 
-        return keras.ops.convert_to_numpy(inference_conditions)
+        return keras.ops.convert_to_numpy(resolved_conditions)
 
     def sample_and_log_prob(
         self,

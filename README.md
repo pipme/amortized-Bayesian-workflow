@@ -61,6 +61,34 @@ pip install -e '.[blackjax]'
 pip install -e '.[tfp]'
 ```
 
+## Logging Configuration
+
+ABW defaults to WARNING-level logging. You can change this globally in notebooks,
+scripts, or shell environments.
+
+Notebook or script:
+
+```python
+import amortized_bayesian_workflow as abw
+
+# ABW log level only
+abw.configure_logging("INFO")
+
+# ABW + noisy external loggers used in common workflows (for example PyMC forward sampling)
+abw.configure_logging("WARNING", include_external_loggers=True)
+```
+
+Shell (affects import-time defaults for the process):
+
+```bash
+export ABW_LOG_LEVEL=ERROR
+export ABW_LOG_INCLUDE_EXTERNAL=1
+python your_script.py
+```
+
+For a clean API, logging is configured via `configure_logging(...)` (runtime)
+or `ABW_LOG_LEVEL` / `ABW_LOG_INCLUDE_EXTERNAL` (process-level defaults).
+
 ## Where To Start
 
 Start here if you are new to the package:

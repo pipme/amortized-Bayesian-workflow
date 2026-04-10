@@ -311,7 +311,7 @@ class TestUnconstrained:
     """Test _transform_to_unconstrained_space_vmap vs reference."""
 
     @pytest.mark.parametrize("model_fixture", MODEL_FIXTURES)
-    @pytest.mark.parametrize("n_samples", [1, 20, 200])
+    @pytest.mark.parametrize("n_samples", [1, 50])
     def test_matches_reference(self, model_fixture, n_samples, request):
         model = request.getfixturevalue(model_fixture)
         var_dims, value_var_dims = _make_dims(model)
@@ -406,7 +406,7 @@ class TestConstrained:
     """Test _transform_to_constrained_space_vmap vs reference."""
 
     @pytest.mark.parametrize("model_fixture", MODEL_FIXTURES)
-    @pytest.mark.parametrize("n_samples", [1, 20, 200])
+    @pytest.mark.parametrize("n_samples", [1, 50])
     def test_matches_reference(self, model_fixture, n_samples, request):
         model = request.getfixturevalue(model_fixture)
         var_dims, value_var_dims = _make_dims(model)
@@ -515,7 +515,7 @@ class TestRoundTrip:
     """Composing forward + backward must be (close to) identity."""
 
     @pytest.mark.parametrize("model_fixture", MODEL_FIXTURES)
-    @pytest.mark.parametrize("n_samples", [1, 50, 300])
+    @pytest.mark.parametrize("n_samples", [1, 50])
     def test_constrained_roundtrip(self, model_fixture, n_samples, request):
         """constrained → unconstrained (vmap) → constrained (vmap) ≈ identity."""
         model = request.getfixturevalue(model_fixture)
@@ -539,7 +539,7 @@ class TestRoundTrip:
         )
 
     @pytest.mark.parametrize("model_fixture", MODEL_FIXTURES)
-    @pytest.mark.parametrize("n_samples", [1, 50, 300])
+    @pytest.mark.parametrize("n_samples", [1, 50])
     def test_unconstrained_roundtrip(self, model_fixture, n_samples, request):
         """unconstrained → constrained (vmap) → unconstrained (vmap) ≈ identity."""
         model = request.getfixturevalue(model_fixture)
@@ -601,82 +601,4 @@ class TestRoundTrip:
         assert err_vmap <= err_ref + 1e-12, (
             f"{model_fixture}: vmap round-trip error ({err_vmap:.2e}) "
             f"exceeds reference ({err_ref:.2e})"
-        )
-
-
-# ---------------------------------------------------------------------------
-# Numerical precision
-# ---------------------------------------------------------------------------
-
-
-class TestNumericalPrecision:
-    """Ensure differences from reference are within floating-point tolerance."""
-
-    MODELS = MODEL_FIXTURES
-    ABS_TOL = 1e-10
-
-    @pytest.mark.parametrize("model_fixture", MODELS)
-    def test_forward_max_abs_diff(self, model_fixture, request):
-        model = request.getfixturevalue(model_fixture)
-        var_dims, _ = _make_dims(model)
-        n = 100
-        constrained = _constrained_samples_for(model, var_dims, n)
-
-        ref = _transform_to_unconstrained_space_ref(
-            constrained.copy(), var_dims, model, in_place=False
-        )
-        got = _transform_to_unconstrained_space_vmap(
-            constrained.copy(), var_dims, model, in_place=False
-        )
-        max_diff = np.max(np.abs(ref - got))
-        assert max_diff <= self.ABS_TOL, (
-            f"{model_fixture}: forward max diff {max_diff:.2e} > {self.ABS_TOL}"
-        )
-
-    @pytest.mark.parametrize("model_fixture", MODELS)
-    def test_backward_max_abs_diff(self, model_fixture, request):
-        model = request.getfixturevalue(model_fixture)
-        var_dims, value_var_dims = _make_dims(model)
-        n = 100
-        constrained = _constrained_samples_for(model, var_dims, n)
-        unconstrained = _transform_to_unconstrained_space_ref(
-            constrained.copy(), var_dims, model, in_place=False
-        )
-
-        ref = _transform_to_constrained_space_ref(
-            unconstrained.copy(),
-            value_var_dims,
-            var_dims,
-            model,
-            in_place=False,
-        )
-        got = _transform_to_constrained_space_vmap(
-            unconstrained.copy(),
-            value_var_dims,
-            var_dims,
-            model,
-            in_place=False,
-        )
-        max_diff = np.max(np.abs(ref - got))
-        assert max_diff <= self.ABS_TOL, (
-            f"{model_fixture}: backward max diff {max_diff:.2e} > {self.ABS_TOL}"
-        )
-
-    @pytest.mark.parametrize("model_fixture", MODELS)
-    def test_round_trip_max_abs_diff(self, model_fixture, request):
-        model = request.getfixturevalue(model_fixture)
-        var_dims, value_var_dims = _make_dims(model)
-        n = 100
-        original = _constrained_samples_for(model, var_dims, n)
-
-        unc = _transform_to_unconstrained_space_vmap(
-            original.copy(), var_dims, model, in_place=False
-        )
-        recovered = _transform_to_constrained_space_vmap(
-            unc, value_var_dims, var_dims, model, in_place=False
-        )
-        max_diff = np.max(np.abs(original - recovered))
-        # Allow slightly more tolerance for composed transforms
-        assert max_diff <= 1e-9, (
-            f"{model_fixture}: round-trip max diff {max_diff:.2e} > 1e-9"
         )

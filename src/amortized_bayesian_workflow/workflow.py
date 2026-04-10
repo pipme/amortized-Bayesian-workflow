@@ -45,7 +45,7 @@ class WorkflowRunner:
 
     def run(self, observations: Sequence[np.ndarray]) -> WorkflowReport:
         self.prepare()
-        self._mahalanobis_reference = self._calibrate_mahalanobis_reference()
+        self._calibrate_mahalanobis_reference()
         indexed = [(i, np.asarray(obs)) for i, obs in enumerate(observations)]
         parallel_mode = (
             "thread"
@@ -66,25 +66,30 @@ class WorkflowRunner:
             metadata={"task_name": self.task.metadata.name},
         )
 
-    def _diagnostic_summaries(self, observations: np.ndarray) -> np.ndarray:
+    def _summary_statistics(self, observations: np.ndarray) -> np.ndarray:
         obs = np.asarray(observations)
-        if self.diagnostic_summary_fn is not None:
-            return np.asarray(self.diagnostic_summary_fn(obs), dtype=float)
         summary_method = getattr(self.approximator, "summary_statistics", None)
         if callable(summary_method):
             return np.asarray(summary_method(obs), dtype=float)
-        # Fallback path for custom amortizers that do not expose learned summaries yet. TODO: this should raise a warning, especially if the observations are high-dimensional.
-        return obs.reshape(obs.shape[0], -1)
+        else:
+            raise ValueError(
+                "Amortized approximator does not provide a summary_statistics method for diagnostics."
+            )
 
     def _calibrate_mahalanobis_reference(
         self,
     ) -> MahalanobisReference | None:
         precomputed = getattr(self.approximator, "training_summaries", None)
         if precomputed is not None and np.asarray(precomputed).shape[0] >= 2:
-            return MahalanobisReference.from_training_summaries(
-                np.asarray(precomputed, dtype=float)
+            self._mahalanobis_reference = (
+                MahalanobisReference.from_training_summaries(
+                    np.asarray(precomputed, dtype=float)
+                )
             )
-        return None
+        else:
+            raise ValueError(
+                "Amortized approximator does not provide summary statistics for training datasets, cannot calibrate Mahalanobis reference for diagnostics."
+            )
 
     def retry_failed(
         self,
@@ -108,9 +113,6 @@ class WorkflowRunner:
                 **(asdict(self.config) | dict(config_override))
             )
         try:
-            self._mahalanobis_reference = (
-                self._calibrate_mahalanobis_reference()
-            )
             rerun_results = {}
             for dataset_id in sorted(ids):
                 rerun_results[dataset_id] = self._process_one_dataset(
@@ -164,9 +166,7 @@ class WorkflowRunner:
                     }
                 )
             elif self._mahalanobis_reference is not None:
-                obs_summary = self._diagnostic_summaries(
-                    observation[None, ...]
-                )[0]
+                obs_summary = self._summary_statistics(observation[None, :])[0]
                 ood = self._mahalanobis_reference.evaluate(
                     obs_summary, alpha=self.config.mahalanobis_alpha
                 )

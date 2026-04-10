@@ -7,10 +7,12 @@ from .base import SamplerBackend, SamplerRequest, SamplerResult
 from .resolve import get_backend
 
 if TYPE_CHECKING:
+    from .blackjax_chees_hmc import BlackJAXCheesHMCBackend
     from .blackjax_nuts import BlackJAXNUTSBackend
     from .tfp_chees_hmc import TFPCheesHMCBackend
 
 __all__ = [
+    "BlackJAXCheesHMCBackend",
     "BlackJAXNUTSBackend",
     "SamplerBackend",
     "SamplerRequest",
@@ -21,6 +23,9 @@ __all__ = [
 
 
 def __getattr__(name: str):
+    if name == "BlackJAXCheesHMCBackend":
+        mod = import_module(".blackjax_chees_hmc", __name__)
+        return getattr(mod, name)
     if name == "BlackJAXNUTSBackend":
         mod = import_module(".blackjax_nuts", __name__)
         return getattr(mod, name)

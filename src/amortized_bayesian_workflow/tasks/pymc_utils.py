@@ -342,8 +342,6 @@ def get_task_func(
             value_var_names=task.value_var_names,
         )
 
-        from .pymc_task import split_to_list_of_arrays
-
         def lp_fn(x: jnp.ndarray, value_var_dims=task.value_var_dims):
             return logdensity_fn(split_to_list_of_arrays(x, value_var_dims))
 
@@ -359,8 +357,6 @@ def get_task_func(
             func_type=func_type,
             value_var_names=task.value_var_names,
         )
-
-        from .pymc_task import split_to_list_of_arrays
 
         def lp_fn(
             x: jnp.ndarray,
