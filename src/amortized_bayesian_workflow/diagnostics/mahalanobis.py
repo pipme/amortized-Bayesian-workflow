@@ -30,6 +30,19 @@ def _validate_summary(summary: np.ndarray, *, dim: int) -> np.ndarray:
     return x
 
 
+def _validate_summaries(summaries: np.ndarray, *, dim: int) -> np.ndarray:
+    x = np.asarray(summaries, dtype=float)
+    if x.ndim != 2:
+        raise ValueError(
+            "Expected summaries with shape (num_datasets, summary_dim)."
+        )
+    if x.shape[1] != dim:
+        raise ValueError(
+            "Summaries shape does not match fitted Mahalanobis reference shape."
+        )
+    return x
+
+
 def _validate_alpha(alpha: float) -> float:
     a = float(alpha)
     if not (0.0 <= a <= 1.0):
@@ -96,6 +109,12 @@ class MahalanobisReference:
         statistic = np.asarray(self.cov.mahalanobis(x[None, :]), dtype=float)
         return float(np.sqrt(np.maximum(statistic[0], 0.0)))
 
+    def statistics_batch(self, summaries: np.ndarray) -> np.ndarray:
+        x = _validate_summaries(summaries, dim=self.mean.shape[0])
+        # sklearn returns squared Mahalanobis distance; we use the standard sqrt distance.
+        statistics = np.asarray(self.cov.mahalanobis(x), dtype=float)
+        return np.sqrt(np.maximum(statistics, 0.0))
+
     def evaluate(
         self, summary: np.ndarray, *, alpha: float = 0.05
     ) -> MahalanobisOODResult:
@@ -107,3 +126,18 @@ class MahalanobisReference:
             alpha=float(alpha),
             rejected=bool(statistic > cutoff),
         )
+
+    def evaluate_batch(
+        self, summaries: np.ndarray, *, alpha: float = 0.05
+    ) -> list[MahalanobisOODResult]:
+        statistics = self.statistics_batch(summaries)
+        cutoff = self.threshold(alpha=alpha)
+        return [
+            MahalanobisOODResult(
+                statistic=float(statistic),
+                cutoff=cutoff,
+                alpha=float(alpha),
+                rejected=bool(statistic > cutoff),
+            )
+            for statistic in statistics
+        ]

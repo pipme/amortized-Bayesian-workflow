@@ -31,6 +31,23 @@ class SamplerResult:
     diagnostics: Mapping[str, Any] = field(default_factory=dict)
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
+    def convergence_value(self, metric: str = "rhat") -> float:
+        value = self.diagnostics.get(metric)
+        if value is None:
+            return np.inf
+        if isinstance(value, np.ndarray):
+            return float(np.nanmax(value))
+        return float(value)
+
+    def is_converged(
+        self,
+        *,
+        metric: str = "rhat",
+        threshold: float = 1.1,
+    ) -> bool:
+        value = self.convergence_value(metric=metric)
+        return bool(np.isfinite(value) and value <= threshold)
+
 
 class SamplerBackend(Protocol):
     name: str

@@ -11,12 +11,17 @@ import numpy as np
 class PSISResult:
     pareto_k: float
     ess: float
-    normalized_weights: np.ndarray
+    smoothed_normalized_weights: np.ndarray
     smoothed_log_weights: np.ndarray
     log_weights: np.ndarray
+    num_proposal_samples: int
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
-    def needs_mcmc(self, threshold: float) -> bool:
+    def needs_mcmc(self) -> bool:
+        if self.num_proposal_samples >= 2000:
+            threshold = 0.7
+        else:
+            threshold = min(1 - 1 / np.log10(self.num_proposal_samples), 0.7)
         return (not np.isfinite(self.pareto_k)) or (self.pareto_k > threshold)
 
 
@@ -38,7 +43,9 @@ def compute_psis(
     log_target = np.asarray(log_target, dtype=float)
     log_proposal = np.asarray(log_proposal, dtype=float)
     if log_target.shape != log_proposal.shape:
-        raise ValueError("log_target and log_proposal must have the same shape.")
+        raise ValueError(
+            "log_target and log_proposal must have the same shape."
+        )
     if log_target.ndim != 1:
         raise ValueError("PSIS expects 1D arrays for a single dataset.")
 
@@ -52,14 +59,15 @@ def compute_psis(
 
     smoothed_logw, pareto_k = arviz_stats.psislw(raw_logw)
     smoothed_logw = np.asarray(smoothed_logw, dtype=float)
-    _, normalized_weights = _normalize_log_weights(smoothed_logw)
-    ess = float(1.0 / np.sum(normalized_weights**2))
+    _, smoothed_normalized_weights = _normalize_log_weights(smoothed_logw)
+    ess = float(1.0 / np.sum(smoothed_normalized_weights**2))
     return PSISResult(
         pareto_k=float(np.asarray(pareto_k)),
         ess=ess,
-        normalized_weights=normalized_weights,
+        smoothed_normalized_weights=smoothed_normalized_weights,
         smoothed_log_weights=smoothed_logw,
         log_weights=np.asarray(raw_logw, dtype=float),
+        num_proposal_samples=int(log_target.shape[0]),
         metadata={"num_samples": int(log_target.shape[0])},
     )
 
@@ -69,13 +77,18 @@ def resample_with_weights(
     weights: np.ndarray,
     *,
     num_draws: int,
-    seed: int,
+    seed: int | None = None,
+    replace=True,
 ) -> np.ndarray:
     samples = np.asarray(samples)
     weights = np.asarray(weights, dtype=float)
     if samples.shape[0] != weights.shape[0]:
         raise ValueError("weights length must match number of samples.")
     rng = np.random.default_rng(seed)
-    idx = rng.choice(samples.shape[0], size=int(num_draws), replace=True, p=weights)
+    idx = rng.choice(
+        samples.shape[0],
+        size=int(num_draws),
+        replace=replace,
+        p=weights,
+    )
     return samples[idx]
-

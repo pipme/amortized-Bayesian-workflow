@@ -36,10 +36,42 @@ def test_statistics_are_square_root_of_sklearn_squared_distance():
 
     ref = MahalanobisReference.from_training_summaries(train)
     raw_squared_stat = float(ref.cov.mahalanobis(probe[None, :])[0])
-    assert np.isclose(ref.statistic(probe), np.sqrt(max(raw_squared_stat, 0.0)))
+    assert np.isclose(
+        ref.statistic(probe), np.sqrt(max(raw_squared_stat, 0.0))
+    )
 
     sqrt_cutoff = ref.threshold(alpha=0.05)
     expected_cutoff = np.quantile(
         np.sqrt(np.maximum(ref.cov.mahalanobis(train), 0.0)), 0.95
     )
     assert np.isclose(sqrt_cutoff, expected_cutoff)
+
+
+def test_statistics_batch_matches_single_statistics():
+    rng = np.random.default_rng(11)
+    train = rng.normal(size=(128, 4))
+    probes = rng.normal(size=(25, 4))
+    ref = MahalanobisReference.from_training_summaries(train)
+
+    batch = ref.statistics_batch(probes)
+    single = np.array([ref.statistic(row) for row in probes])
+
+    assert batch.shape == (25,)
+    assert np.allclose(batch, single)
+
+
+def test_evaluate_batch_matches_single_evaluate():
+    rng = np.random.default_rng(19)
+    train = rng.normal(size=(150, 3))
+    probes = rng.normal(size=(10, 3))
+    ref = MahalanobisReference.from_training_summaries(train)
+
+    batch = ref.evaluate_batch(probes, alpha=0.1)
+    single = [ref.evaluate(row, alpha=0.1) for row in probes]
+
+    assert len(batch) == probes.shape[0]
+    for b, s in zip(batch, single):
+        assert np.isclose(b.statistic, s.statistic)
+        assert np.isclose(b.cutoff, s.cutoff)
+        assert np.isclose(b.alpha, s.alpha)
+        assert b.rejected == s.rejected

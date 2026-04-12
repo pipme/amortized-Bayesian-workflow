@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -61,10 +61,14 @@ class WorkflowConfig:
     force_psis_for_all_datasets: bool = False
     psis_k_threshold: float = 0.7
     force_mcmc: bool = False
-    mcmc_backend: str = "blackjax_nuts"
+    mcmc_sampler: str = "nuts"
+    mcmc_backend: str | None = None
     mcmc_warmup: int = 1_000
     mcmc_num_samples: int = 1_000
     mcmc_init_top_k: int = 8
+    store_psis_resampled_draws: bool = False
+    mcmc_backend_options: dict[str, object] = field(default_factory=dict)
+    persist_dataset_results: bool = False
     parallel_workers: int | None = None
     parallel_mode: str = "none"
     seed: int = 0

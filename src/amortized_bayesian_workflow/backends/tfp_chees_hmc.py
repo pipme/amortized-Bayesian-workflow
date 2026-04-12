@@ -19,22 +19,26 @@ class TFPCheesHMCBackend:
 
     def run(self, request: SamplerRequest) -> SamplerResult:
         opt = dict(request.options)
-        num_superchains = int(opt.pop("num_superchains", request.initial_positions.shape[0]))
+        num_superchains = int(
+            opt.pop("num_superchains", request.initial_positions.shape[0])
+        )
         subchains_per_superchain = int(opt.pop("subchains_per_superchain", 1))
         init_step_size = float(opt.pop("init_step_size", 0.1))
-        sort_initial_positions = bool(opt.pop("sort_initial_positions", False))
 
         filtered = filter_initial_positions(
             request.initial_positions,
             request.log_prob_fn,
-            sort_descending=sort_initial_positions,
         )
         if filtered.positions.shape[0] < num_superchains:
             raise ValueError("Not enough valid unique initial positions.")
 
         seeds = jax.random.PRNGKey(request.seed)
-        base_positions = filtered.positions[:num_superchains].astype(np.float64)
-        tiled_positions = np.repeat(base_positions, subchains_per_superchain, axis=0)
+        base_positions = filtered.positions[:num_superchains].astype(
+            np.float64
+        )
+        tiled_positions = np.repeat(
+            base_positions, subchains_per_superchain, axis=0
+        )
 
         target_log_prob_fn = opt.pop("target_log_prob_fn", request.log_prob_fn)
         leapfrog_steps = int(opt.pop("num_leapfrog_steps", 1))
@@ -62,9 +66,11 @@ class TFPCheesHMCBackend:
             seed=seeds,
             trace_fn=lambda _, kernel_results: kernel_results,
         )
-        draws = np.asarray(draws_t[request.num_warmup:].swapaxes(0, 1))
+        draws = np.asarray(draws_t[request.num_warmup :].swapaxes(0, 1))
         diagnostics = {
-            **summarize_chain_convergence(draws, num_superchains=num_superchains),
+            **summarize_chain_convergence(
+                draws, num_superchains=num_superchains
+            ),
             "filtered_initial_log_prob": filtered.log_prob[:num_superchains],
             "num_valid_initial_positions": int(filtered.positions.shape[0]),
         }
@@ -75,6 +81,6 @@ class TFPCheesHMCBackend:
             metadata={
                 "num_superchains": num_superchains,
                 "subchains_per_superchain": subchains_per_superchain,
-                "sampler": "hmc_chees",
+                "sampler": "chees_hmc",
             },
         )

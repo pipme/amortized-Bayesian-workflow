@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any, Mapping
 
 import numpy as np
+
+from .psis import resample_with_weights
+from .utils import read_from_file
 
 
 @dataclass(frozen=True)
@@ -11,12 +15,47 @@ class DatasetResult:
     dataset_id: int
     status: str
     message: str
-    posterior_draws: np.ndarray | None = None
-    amortized_draws: np.ndarray | None = None
+    posterior_source: str | None = None
     amortized: Mapping[str, Any] = field(default_factory=dict)
     psis: Mapping[str, Any] = field(default_factory=dict)
     mcmc: Mapping[str, Any] = field(default_factory=dict)
     error: str | None = None
+
+    @property
+    def posterior_draws(self) -> np.ndarray | None:
+        if self.posterior_source == "mcmc":
+            draws = self.mcmc.get("draws")
+            return None if draws is None else np.asarray(draws)
+        if self.posterior_source == "amortized":
+            draws = self.amortized.get("draws")
+            return None if draws is None else np.asarray(draws)
+        if self.posterior_source == "psis_weighted":
+            resampled = self.psis.get("resampled_draws")
+            if resampled is not None:
+                return np.asarray(resampled)
+            amortized = self.amortized.get("draws")
+            weights = self.psis.get("smoothed_normalized_weights")
+            if amortized is None or weights is None:
+                return None
+            amortized = np.asarray(amortized)
+            num_draws = int(amortized.shape[0])
+            return resample_with_weights(
+                amortized,
+                np.asarray(weights, dtype=float),
+                num_draws=num_draws,
+                seed=self.psis.get("posterior_seed"),
+            )
+        return None
+
+    @property
+    def amortized_draws(self) -> np.ndarray | None:
+        draws = self.amortized.get("draws")
+        return None if draws is None else np.asarray(draws)
+
+    @property
+    def mcmc_draws(self) -> np.ndarray | None:
+        draws = self.mcmc.get("draws")
+        return None if draws is None else np.asarray(draws)
 
     def suggestion(self) -> str | None:
         if self.status == "success":
@@ -48,19 +87,8 @@ class WorkflowReport:
                     "dataset_id": r.dataset_id,
                     "status": r.status,
                     "message": r.message,
-                    "mahalanobis_statistic": r.amortized.get(
-                        "mahalanobis_statistic",
-                        r.amortized.get("mahalanobis_distance"),
-                    ),
-                    "mahalanobis_cutoff": r.amortized.get(
-                        "mahalanobis_cutoff",
-                        r.amortized.get("mahalanobis_threshold"),
-                    ),
-                    "ood_rejected": r.amortized.get("ood_rejected"),
-                    "pareto_k": r.psis.get("pareto_k"),
-                    "psis_ess": r.psis.get("ess"),
+                    "posterior_source": r.posterior_source,
                     "mcmc_backend": r.mcmc.get("backend"),
-                    "mcmc_rhat": r.mcmc.get("rhat", r.mcmc.get("nested_rhat")),
                     "error": r.error,
                 }
             )
@@ -86,38 +114,6 @@ class WorkflowReport:
                 out[r.dataset_id] = r.posterior_draws
         return out
 
-    def plot_diagnostics(self, dataset_id: int):
-        try:
-            import matplotlib.pyplot as plt
-        except ModuleNotFoundError as exc:
-            raise RuntimeError(
-                "matplotlib is required for plotting diagnostics."
-            ) from exc
-
-        row = None
-        for r in self.results:
-            if r.dataset_id == dataset_id:
-                row = r
-                break
-        if row is None:
-            raise KeyError(dataset_id)
-
-        fig, ax = plt.subplots(1, 1, figsize=(6, 3))
-        labels = ["Mahalanobis", "Pareto k", "PSIS ESS"]
-        values = [
-            row.amortized.get(
-                "mahalanobis_statistic",
-                row.amortized.get("mahalanobis_distance", np.nan),
-            ),
-            row.psis.get("pareto_k", np.nan),
-            row.psis.get("ess", np.nan),
-        ]
-        ax.bar(labels, values, color=["#64748b", "#d97706", "#0ea5e9"])
-        ax.set_title(f"Dataset {dataset_id} diagnostics ({row.status})")
-        ax.axhline(0.7, linestyle="--", linewidth=1, color="gray")
-        fig.tight_layout()
-        return fig
-
     def status_counts(self) -> dict[str, int]:
         counts: dict[str, int] = {}
         for r in self.results:
@@ -129,3 +125,60 @@ class WorkflowReport:
     ) -> "WorkflowReport":
         replaced = tuple(updates.get(r.dataset_id, r) for r in self.results)
         return replace(self, results=replaced)
+
+    @classmethod
+    def from_dataset_results_dir(
+        cls,
+        path: str | Path,
+        *,
+        config: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        use_pickle: bool = False,
+        strict: bool = False,
+    ) -> "WorkflowReport":
+        """Build a report post-hoc from per-dataset result artifacts.
+
+        Expected files are `dataset_<id>.dill` by default, or `.pkl` when
+        `use_pickle=True`.
+        """
+        root = Path(path)
+        ext = ".pkl" if use_pickle else ".dill"
+        files = sorted(root.glob(f"dataset_*{ext}"))
+
+        # Fallback to the other extension when needed.
+        if not files:
+            alt = ".dill" if ext == ".pkl" else ".pkl"
+            files = sorted(root.glob(f"dataset_*{alt}"))
+
+        results: list[DatasetResult] = []
+        invalid_files: list[str] = []
+        for p in files:
+            try:
+                item = read_from_file(p, use_pickle=use_pickle)
+            except Exception:
+                if strict:
+                    raise
+                invalid_files.append(str(p.name))
+                continue
+
+            if isinstance(item, DatasetResult):
+                results.append(item)
+            else:
+                if strict:
+                    raise TypeError(
+                        f"Artifact {p} is not a DatasetResult instance."
+                    )
+                invalid_files.append(str(p.name))
+
+        results.sort(key=lambda r: int(r.dataset_id))
+
+        md = dict(metadata or {})
+        md.setdefault("source_dir", str(root))
+        if invalid_files:
+            md["invalid_artifacts"] = invalid_files
+
+        return cls(
+            results=tuple(results),
+            config=dict(config or {}),
+            metadata=md,
+        )
