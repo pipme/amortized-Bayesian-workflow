@@ -51,20 +51,18 @@ class ArtifactLayout:
 class WorkflowConfig:
     """High-level workflow settings independent of a specific backend."""
 
-    num_train_simulations: int = 10_000
-    num_validation_simulations: int = 1_000
-    num_diagnostic_simulations: int = 200
-    num_amortized_draws: int = 2_000
-    batch_size: int = 256
-    epochs: int = 100
-
+    num_amortized_draws: int = 2000
     mahalanobis_alpha: float = 0.05
     force_psis_for_all_datasets: bool = False
     store_psis_resampled_draws: bool = False
 
     force_mcmc: bool = False
-    mcmc_backend: str = "nuts"
-    mcmc_backend_options: dict[str, object] = field(default_factory=dict)
+    mcmc_backend: str = "blackjax_chees_hmc"
+    mcmc_backend_options: dict[str, object] = field(
+        default_factory=lambda: {
+            "rhat_threshold": 1.01,
+        }
+    )
 
     persist_dataset_results: bool = False
     rewrite_persisted_dataset_results: bool = False

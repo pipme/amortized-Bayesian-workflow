@@ -22,7 +22,7 @@ class BlackJAXNUTSBackend:
             )
 
         opt = dict(request.options)
-        num_chains = int(opt.pop("num_chains", 1))
+        num_chains = int(opt.pop("num_chains", 4))
         store_warmup_state = bool(opt.pop("store_warmup_state", False))
         target_accept = float(opt.pop("target_accept", 0.8))
 

@@ -34,7 +34,6 @@ class PsychometricTask(PyMCTask):
             # Add overdispersion parameter
             var_dims["nu"] = 1
             task_name += "_overdispersion"
-        var_names = list(var_dims.keys())
 
         if observed_responses is None:
             # Generate synthetic data using true parameters

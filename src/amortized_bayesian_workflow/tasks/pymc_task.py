@@ -151,12 +151,12 @@ class PyMCTask(ABC):
         self,
         batch_size: int,
         unconstrained=True,
-        random_seed: RandomState = None,
+        seed: RandomState = None,
         **kwargs,
     ):
         logger.info("Simulating from PyMC model...")
         prior_samples, observation_sims = self.prior._sample_prior_predictive(
-            batch_size, random_seed=random_seed
+            batch_size, seed=seed
         )
 
         if unconstrained:
@@ -303,7 +303,7 @@ class PyMCPriorWrapper:
     def _sample_prior_predictive(
         self,
         sample_shape: tuple | int | None = None,
-        random_seed: RandomState = None,
+        seed: RandomState = None,
     ):
         """Sample from the prior predictive distribution. This is used to
         generate prior samples and the corresponding synthetic simulations.
@@ -328,7 +328,7 @@ class PyMCPriorWrapper:
         assert len(sample_shape) == 1
         N_sims = sample_shape[0]
         idata_prior = pm.sample_prior_predictive(
-            samples=N_sims, model=self.pymc_model, random_seed=random_seed
+            samples=N_sims, model=self.pymc_model, random_seed=seed
         )
         _, observation_sims = az.sel_utils.xarray_to_ndarray(
             idata_prior.prior_predictive

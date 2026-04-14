@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import (
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+    as_completed,
+)
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, TypeVar
 
@@ -28,7 +32,9 @@ def map_parallel(
         ThreadPoolExecutor if mode == "thread" else ProcessPoolExecutor
     )
     with executor_cls(max_workers=max_workers) as ex:
-        yield from ex.map(fn, items)
+        futures = [ex.submit(fn, item) for item in items]
+        for future in as_completed(futures):
+            yield future.result()
 
 
 def save_to_file(data, file_path, use_pickle=True):

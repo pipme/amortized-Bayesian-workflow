@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 import numpy as np
+from tqdm.auto import tqdm
 
 from .approximators.base import AmortizedPosterior
 from .backends import get_backend, prepare_sampler_request
@@ -30,7 +31,6 @@ class WorkflowRunner:
     approximator: AmortizedPosterior
     config: WorkflowConfig
     layout: ArtifactLayout | None = None
-    diagnostic_summary_fn: Callable[[np.ndarray], np.ndarray] | None = None
 
     def __post_init__(self) -> None:
         self._mahalanobis_reference: MahalanobisReference | None = None
@@ -83,15 +83,23 @@ class WorkflowRunner:
             if self.config.parallel_mode == "auto"
             else self.config.parallel_mode
         )
-        for result in map_parallel(
+        dataset_results = map_parallel(
             self._process_one_dataset,
             indexed_with_ood,
             mode=parallel_mode,
             max_workers=self.config.parallel_workers,
-        ):
-            results_by_id[result.dataset_id] = result
-            if self.config.persist_dataset_results:
-                self._save_dataset_result(result)
+        )
+        with tqdm(
+            total=len(indexed_with_ood),
+            desc="Processing datasets",
+            miniters=1,
+        ) as progress:
+            for result in dataset_results:
+                results_by_id[result.dataset_id] = result
+                if self.config.persist_dataset_results:
+                    self._save_dataset_result(result)
+                progress.update(1)
+                progress.refresh()
 
         results = tuple(results_by_id[dataset_id] for dataset_id, _ in indexed)
         return WorkflowReport(
@@ -265,16 +273,17 @@ class WorkflowRunner:
 
             needs_mcmc = self.config.force_mcmc or psis.needs_mcmc()
             if needs_mcmc:
-                backend_name = self._resolve_mcmc_backend_name()
-                backend = get_backend(backend_name)
+                backend = get_backend(self.config.mcmc_backend)
+                log_post_single = self.task.single_log_posterior_fn(
+                    observation
+                )
+
                 mcmc_request = prepare_sampler_request(
-                    backend_name=backend_name,
+                    backend_name=self.config.mcmc_backend,
                     q_samples=q_samples,
-                    log_prob_fn=log_post_vec,
+                    log_prob_fn=log_post_single,
                     seed=base_seed + 3,
-                    overrides=self._mcmc_overrides_for_backend(
-                        backend_name=backend_name
-                    ),
+                    overrides=dict(self.config.mcmc_backend_options),
                     psis_log_weights=psis.smoothed_log_weights,
                     psis_weights=psis.smoothed_normalized_weights,
                 )
@@ -288,24 +297,19 @@ class WorkflowRunner:
                     **dict(mcmc_result.diagnostics),
                     **dict(mcmc_result.metadata),
                 }
-                preferred_metric = (
-                    "nested_rhat" if "chees" in backend_name else "rhat"
-                )
-                convergence_metric = preferred_metric
-                rhat_max = mcmc_result.convergence_value(
-                    metric=convergence_metric
-                )
-                mcmc_payload["convergence_metric"] = convergence_metric
-                mcmc_payload["convergence_value"] = rhat_max
                 status = (
                     "success"
-                    if mcmc_result.is_converged(metric=convergence_metric)
+                    if mcmc_result.is_converged(
+                        threshold=self.config.mcmc_backend_options.get(
+                            "rhat_threshold", 1.01
+                        )
+                    )
                     else "needs_review"
                 )
                 message = (
-                    "MCMC refinement completed."
+                    "MCMC sampling completed."
                     if status == "success"
-                    else "MCMC completed but diagnostics suggest review."
+                    else f"MCMC completed but diagnostics suggest review. {mcmc_result.rhat_name}: {mcmc_result.diagnostics[mcmc_result.rhat_name]}"
                 )
                 posterior_source = "mcmc"
             else:
@@ -331,37 +335,16 @@ class WorkflowRunner:
             )
 
     def _resolve_mcmc_backend_name(self) -> str:
-        sampler_name = self.config.mcmc_backend
-        if not sampler_name:
-            sampler_name = "nuts"
+        backend_name = self.config.mcmc_backend.strip().lower()
+        if not backend_name:
+            backend_name = "blackjax_nuts"
 
-        normalized = sampler_name.lower()
-        aliases = {
-            "nuts": "blackjax_nuts",
-            "blackjax_nuts": "blackjax_nuts",
-            "chees_hmc": "blackjax_chees_hmc",
-            "blackjax_chees_hmc": "blackjax_chees_hmc",
-            "tfp_chees_hmc": "tfp_chees_hmc",
-        }
-        return aliases.get(normalized, normalized)
+        try:
+            get_backend(backend_name)
+        except KeyError as exc:
+            raise ValueError(str(exc)) from exc
 
-    def _mcmc_overrides_for_backend(
-        self,
-        *,
-        backend_name: str,
-    ) -> dict[str, Any]:
-        options = dict(self.config.mcmc_backend_options)
-
-        backend_specific: dict[str, Any] = {}
-        for key in (backend_name, self.config.mcmc_sampler.strip().lower()):
-            value = options.pop(key, None)
-            if isinstance(value, dict):
-                backend_specific.update(value)
-
-        return {
-            **backend_specific,
-            **options,
-        }
+        return backend_name
 
     def _load_saved_dataset_results(self) -> dict[int, DatasetResult]:
         if self.layout is None:

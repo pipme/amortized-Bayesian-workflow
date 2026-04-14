@@ -66,7 +66,6 @@ def prepare_sampler_request(
     backend_name: str,
     q_samples: np.ndarray,
     log_prob_fn: Callable[[np.ndarray], np.ndarray] | None = None,
-    single_log_prob_fn: Callable[[Any], Any] | None = None,
     seed: int,
     overrides: Mapping[str, Any] | None = None,
     psis_log_weights: np.ndarray | None = None,
@@ -78,38 +77,32 @@ def prepare_sampler_request(
     override defaults through `overrides`.
     """
 
-    get_backend(backend_name)
-    single_log_prob_fn = _resolve_log_prob_functions(
-        log_prob_fn=log_prob_fn,
-        single_log_prob_fn=single_log_prob_fn,
-    )
     fallback_defaults: dict[str, dict[str, Any]] = {
         "blackjax_nuts": {
-            "num_warmup": 1_000,
-            "num_samples": 1_000,
-            "initial_position_source": "amortized_random",
-            "chain_count_option": "num_chains",
-            "chain_count": 8,
-            "options": {"target_accept": 0.8},
+            "iter_warmup": 1_000,
+            "iter_sampling": 1_000,
+            "initial_position_source": "amortized",
+            "options": {
+                "num_chains": 4,
+                "target_accept": 0.8,
+            },
         },
         "blackjax_chees_hmc": {
-            "num_warmup": 200,
-            "num_samples": 1,
-            "initial_position_source": "amortized_random",
-            "chain_count_option": "num_superchains",
-            "chain_count": 16,
+            "iter_warmup": 200,
+            "iter_sampling": 1,
+            "initial_position_source": "amortized",
             "options": {
+                "num_superchains": 16,
                 "num_subchains_per_superchain": 128,
                 "initial_step_size": 0.1,
             },
         },
         "tfp_chees_hmc": {
-            "num_warmup": 200,
-            "num_samples": 1_000,
-            "initial_position_source": "amortized_random",
-            "chain_count_option": "num_superchains",
-            "chain_count": 16,
+            "iter_warmup": 200,
+            "iter_sampling": 1,
+            "initial_position_source": "amortized",
             "options": {
+                "num_superchains": 16,
                 "num_subchains_per_superchain": 128,
                 "init_step_size": 0.1,
             },
@@ -118,23 +111,21 @@ def prepare_sampler_request(
     backend_fallback = fallback_defaults.get(
         backend_name,
         {
-            "num_warmup": 1_000,
-            "num_samples": 1_000,
-            "initial_position_source": "amortized_random",
-            "chain_count_option": "num_chains",
-            "chain_count": 8,
-            "options": {},
+            "iter_warmup": 1_000,
+            "iter_sampling": 1_000,
+            "initial_position_source": "amortized",
+            "options": {"num_chains": 8},
         },
     )
 
     override_dict = dict(overrides or {})
     options_override = dict(override_dict.pop("options", {}))
 
-    num_warmup = int(
-        override_dict.pop("num_warmup", backend_fallback["num_warmup"])
+    iter_warmup = int(
+        override_dict.pop("iter_warmup", backend_fallback["iter_warmup"])
     )
-    num_samples = int(
-        override_dict.pop("num_samples", backend_fallback["num_samples"])
+    iter_sampling = int(
+        override_dict.pop("iter_sampling", backend_fallback["iter_sampling"])
     )
     init_source = (
         str(
@@ -153,31 +144,17 @@ def prepare_sampler_request(
         **override_dict,
     }
 
-    chain_key = str(backend_fallback["chain_count_option"])
-    default_chain_count = int(backend_fallback["chain_count"])
-    if chain_key == "num_chains":
-        chain_count = int(
-            options.pop(
-                "num_chains",
-                options.pop("num_superchains", default_chain_count),
-            )
-        )
+    if backend_name in {"blackjax_chees_hmc", "tfp_chees_hmc"}:
+        chain_count = int(options.pop("num_superchains"))
     else:
-        chain_count = int(
-            options.pop(
-                "num_superchains",
-                options.pop("num_chains", default_chain_count),
-            )
-        )
-    chain_count = max(1, min(chain_count, q_samples.shape[0]))
+        chain_count = int(options.pop("num_chains"))
 
-    rng = np.random.default_rng(int(seed))
-    if init_source in {"amortized", "amortized_random", "random"}:
-        init_idx = rng.choice(
-            q_samples.shape[0], size=chain_count, replace=False
-        )
-        initial_positions = np.asarray(q_samples[init_idx], dtype=float)
-    elif init_source in {"psis_resampled", "psis_weighted"}:
+    assert chain_count <= q_samples.shape[0], (
+        "Not enough q_samples to initialize the requested number of (super)chains."
+    )
+    if init_source in {"amortized"}:
+        initial_positions = np.asarray(q_samples[:chain_count], dtype=float)
+    elif init_source in {"psis_resampled"}:
         if psis_weights is None:
             raise ValueError(
                 "psis_weights is required when initial_position_source='psis_resampled'."
@@ -192,23 +169,11 @@ def prepare_sampler_request(
             ),
             dtype=float,
         )
-    # elif init_source in {"psis_top", "top_weighted"}:
-    #     if psis_log_weights is None:
-    #         raise ValueError(
-    #             "psis_log_weights is required when initial_position_source='psis_top'."
-    #         )
-    #     init_idx = np.argsort(-np.asarray(psis_log_weights))[:chain_count]
-    #     initial_positions = np.asarray(q_samples[init_idx], dtype=float)
     else:
         raise ValueError(
             "Unsupported initial_position_source. "
-            "Use one of: amortized_random, psis_resampled, psis_top."
+            "Use one of: amortized, psis_resampled."
         )
-
-    if chain_key == "num_chains":
-        options["num_chains"] = int(chain_count)
-    else:
-        options["num_superchains"] = int(chain_count)
 
     if "num_subchains_per_superchain" in options:
         options["subchains_per_superchain"] = int(
@@ -217,9 +182,9 @@ def prepare_sampler_request(
 
     return SamplerRequest(
         initial_positions=initial_positions,
-        log_prob_fn=single_log_prob_fn,
-        iter_warmup=num_warmup,
-        iter_sampling=num_samples,
+        log_prob_fn=log_prob_fn,
+        iter_warmup=iter_warmup,
+        iter_sampling=iter_sampling,
         seed=int(seed),
         options=options,
     )
