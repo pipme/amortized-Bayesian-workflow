@@ -192,7 +192,10 @@ Retry only failed datasets with different settings:
 report = workflow.retry_failed(
     report,
     observations_batch,
-    config_override={"mcmc_warmup": 2000, "mcmc_backend": "tfp_chees_hmc"},
+   config_override={
+      "mcmc_backend": "tfp_chees_hmc",
+      "mcmc_backend_options": {"num_warmup": 2000},
+   },
 )
 ```
 

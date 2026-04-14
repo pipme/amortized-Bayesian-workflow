@@ -5,8 +5,7 @@ from typing import Any, Callable, Mapping, Protocol
 
 import numpy as np
 
-LogProbFn = Callable[[np.ndarray], np.ndarray]
-SingleLogProbFn = Callable[[Any], Any]
+LogProbFn = Callable[[Any], Any]
 
 
 @dataclass(frozen=True)
@@ -14,11 +13,10 @@ class SamplerRequest:
     """Backend-agnostic sampling request."""
 
     log_prob_fn: LogProbFn
-    num_warmup: int
-    num_samples: int
+    iter_warmup: int
+    iter_sampling: int
     seed: int = 0
     initial_positions: np.ndarray | None = None
-    single_log_prob_fn: SingleLogProbFn | None = None
     options: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -31,21 +29,17 @@ class SamplerResult:
     diagnostics: Mapping[str, Any] = field(default_factory=dict)
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
-    def convergence_value(self, metric: str = "rhat") -> float:
-        value = self.diagnostics.get(metric)
-        if value is None:
-            return np.inf
-        if isinstance(value, np.ndarray):
-            return float(np.nanmax(value))
-        return float(value)
-
     def is_converged(
         self,
         *,
-        metric: str = "rhat",
-        threshold: float = 1.1,
+        threshold: float = 1.01,
     ) -> bool:
-        value = self.convergence_value(metric=metric)
+        if "num_superchains" in self.metadata:
+            metric = "nested_rhat"
+        else:
+            metric = "rhat"
+        value = self.diagnostics.get(metric)
+        value = float(np.max(value))
         return bool(np.isfinite(value) and value <= threshold)
 
 

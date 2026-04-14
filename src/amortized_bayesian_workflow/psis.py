@@ -68,7 +68,6 @@ def compute_psis(
         smoothed_log_weights=smoothed_logw,
         log_weights=np.asarray(raw_logw, dtype=float),
         num_proposal_samples=int(log_target.shape[0]),
-        metadata={"num_samples": int(log_target.shape[0])},
     )
 
 

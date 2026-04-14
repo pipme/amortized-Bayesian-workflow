@@ -47,16 +47,6 @@ class DatasetResult:
             )
         return None
 
-    @property
-    def amortized_draws(self) -> np.ndarray | None:
-        draws = self.amortized.get("draws")
-        return None if draws is None else np.asarray(draws)
-
-    @property
-    def mcmc_draws(self) -> np.ndarray | None:
-        draws = self.mcmc.get("draws")
-        return None if draws is None else np.asarray(draws)
-
     def suggestion(self) -> str | None:
         if self.status == "success":
             return None

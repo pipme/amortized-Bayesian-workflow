@@ -57,18 +57,17 @@ class WorkflowConfig:
     num_amortized_draws: int = 2_000
     batch_size: int = 256
     epochs: int = 100
+
     mahalanobis_alpha: float = 0.05
     force_psis_for_all_datasets: bool = False
-    psis_k_threshold: float = 0.7
-    force_mcmc: bool = False
-    mcmc_sampler: str = "nuts"
-    mcmc_backend: str | None = None
-    mcmc_warmup: int = 1_000
-    mcmc_num_samples: int = 1_000
-    mcmc_init_top_k: int = 8
     store_psis_resampled_draws: bool = False
+
+    force_mcmc: bool = False
+    mcmc_backend: str = "nuts"
     mcmc_backend_options: dict[str, object] = field(default_factory=dict)
+
     persist_dataset_results: bool = False
+    rewrite_persisted_dataset_results: bool = False
     parallel_workers: int | None = None
     parallel_mode: str = "none"
     seed: int = 0

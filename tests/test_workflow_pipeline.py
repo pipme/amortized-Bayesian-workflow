@@ -161,7 +161,7 @@ def test_workflow_run_psis_only(monkeypatch):
 
     cfg = WorkflowConfig(
         num_amortized_draws=20,
-        mcmc_num_samples=10,
+        mcmc_backend_options={"num_samples": 10},
         force_psis_for_all_datasets=True,
         parallel_mode="none",
     )
@@ -176,6 +176,7 @@ def test_workflow_run_psis_only(monkeypatch):
 
 
 def test_workflow_run_triggers_mcmc_and_retry_failed(monkeypatch):
+    import amortized_bayesian_workflow.backends as backends_mod
     import amortized_bayesian_workflow.workflow as wf_mod
 
     calls = {"n": 0}
@@ -195,11 +196,19 @@ def test_workflow_run_triggers_mcmc_and_retry_failed(monkeypatch):
         )
 
     monkeypatch.setattr(wf_mod, "compute_psis", fake_compute_psis)
+    original_get_backend = wf_mod.get_backend
+
+    def fake_get_backend(name: str):
+        if name == "fake_mcmc":
+            return make_fake_backend()
+        return original_get_backend(name)
+
+    monkeypatch.setattr(wf_mod, "get_backend", fake_get_backend)
+    monkeypatch.setattr(backends_mod, "get_backend", fake_get_backend)
 
     cfg = WorkflowConfig(
         num_amortized_draws=16,
-        mcmc_num_samples=5,
-        mcmc_warmup=10,
+        mcmc_backend_options={"num_samples": 5, "num_warmup": 10},
         mcmc_sampler="fake_mcmc",
         force_psis_for_all_datasets=True,
         parallel_mode="none",
@@ -208,7 +217,6 @@ def test_workflow_run_triggers_mcmc_and_retry_failed(monkeypatch):
         task=FakeTask(),
         approximator=FakeAmortizer(),
         config=cfg,
-        backend_factories={"fake_mcmc": make_fake_backend},
     )
     observations = [np.array([0.0, 0.0])]
     report = runner.run(observations)
@@ -255,7 +263,7 @@ def test_workflow_batch_mahalanobis_only_sends_ood_to_psis(monkeypatch):
 
     cfg = WorkflowConfig(
         num_amortized_draws=30,
-        mcmc_num_samples=8,
+        mcmc_backend_options={"num_samples": 8},
         parallel_mode="none",
         mahalanobis_alpha=0.05,
     )
@@ -273,6 +281,7 @@ def test_workflow_batch_mahalanobis_only_sends_ood_to_psis(monkeypatch):
 
 
 def test_workflow_mcmc_sampler_alias_and_chees_options(monkeypatch):
+    import amortized_bayesian_workflow.backends as backends_mod
     import amortized_bayesian_workflow.workflow as wf_mod
 
     def fake_compute_psis(*, log_target, log_proposal):
@@ -288,13 +297,22 @@ def test_workflow_mcmc_sampler_alias_and_chees_options(monkeypatch):
         )
 
     monkeypatch.setattr(wf_mod, "compute_psis", fake_compute_psis)
+    original_get_backend = wf_mod.get_backend
+
+    def fake_get_backend(name: str):
+        if name == "blackjax_chees_hmc":
+            return make_fake_chees_backend()
+        return original_get_backend(name)
+
+    monkeypatch.setattr(wf_mod, "get_backend", fake_get_backend)
+    monkeypatch.setattr(backends_mod, "get_backend", fake_get_backend)
 
     cfg = WorkflowConfig(
         num_amortized_draws=16,
-        mcmc_num_samples=5,
-        mcmc_warmup=10,
         mcmc_sampler="chees_hmc",
         mcmc_backend_options={
+            "num_samples": 5,
+            "num_warmup": 10,
             "num_superchains": 3,
             "num_subchains_per_superchain": 2,
         },
@@ -305,7 +323,6 @@ def test_workflow_mcmc_sampler_alias_and_chees_options(monkeypatch):
         task=FakeTask(),
         approximator=FakeAmortizer(),
         config=cfg,
-        backend_factories={"blackjax_chees_hmc": make_fake_chees_backend},
     )
 
     report = runner.run([np.array([0.0, 0.0])])
@@ -314,6 +331,7 @@ def test_workflow_mcmc_sampler_alias_and_chees_options(monkeypatch):
     assert first.mcmc["backend"] == "blackjax_chees_hmc"
     assert first.mcmc["convergence_metric"] == "nested_rhat"
     assert FakeCheesBackend.last_options == {
+        "initial_step_size": 0.1,
         "num_superchains": 3,
         "subchains_per_superchain": 2,
     }
@@ -340,7 +358,7 @@ def test_psis_weighted_posterior_draws_are_resampled_not_raw(monkeypatch):
 
     cfg = WorkflowConfig(
         num_amortized_draws=20,
-        mcmc_num_samples=5,
+        mcmc_backend_options={"num_samples": 5},
         force_psis_for_all_datasets=True,
         parallel_mode="none",
     )
@@ -377,7 +395,7 @@ def test_workflow_report_save_and_load_roundtrip(tmp_path, monkeypatch):
 
     cfg = WorkflowConfig(
         num_amortized_draws=10,
-        mcmc_num_samples=4,
+        mcmc_backend_options={"num_samples": 4},
         force_psis_for_all_datasets=True,
         parallel_mode="none",
     )
@@ -429,7 +447,7 @@ def test_workflow_persists_dataset_results_incrementally(
 
     cfg = WorkflowConfig(
         num_amortized_draws=12,
-        mcmc_num_samples=4,
+        mcmc_backend_options={"num_samples": 4},
         force_psis_for_all_datasets=True,
         parallel_mode="none",
         persist_dataset_results=True,
@@ -488,7 +506,7 @@ def test_workflow_reuses_saved_dataset_results(tmp_path, monkeypatch):
 
     cfg = WorkflowConfig(
         num_amortized_draws=12,
-        mcmc_num_samples=4,
+        mcmc_backend_options={"num_samples": 4},
         force_psis_for_all_datasets=True,
         parallel_mode="none",
         persist_dataset_results=True,
@@ -504,3 +522,63 @@ def test_workflow_reuses_saved_dataset_results(tmp_path, monkeypatch):
 
     assert report.results[0].message == "cached"
     assert calls["n"] == 1
+
+
+def test_workflow_rewrites_saved_dataset_results_when_enabled(
+    tmp_path, monkeypatch
+):
+    import amortized_bayesian_workflow.workflow as wf_mod
+    from amortized_bayesian_workflow.config import ArtifactLayout
+    from amortized_bayesian_workflow.utils import save_to_file
+
+    calls = {"n": 0}
+
+    def fake_compute_psis(*, log_target, log_proposal):
+        calls["n"] += 1
+        n = len(log_target)
+        return FakePSIS(
+            pareto_k=0.1,
+            ess=float(n),
+            smoothed_normalized_weights=np.ones(n) / n,
+            smoothed_log_weights=np.zeros(n),
+            log_weights=np.zeros(n),
+            num_proposal_samples=n,
+            metadata={"num_samples": float(n)},
+        )
+
+    monkeypatch.setattr(wf_mod, "compute_psis", fake_compute_psis)
+
+    layout = ArtifactLayout(root=tmp_path, task_name="fake", run_name="r3")
+    layout.ensure()
+    cached = DatasetResult(
+        dataset_id=0,
+        status="success",
+        message="cached",
+        posterior_source="amortized",
+        amortized={"draws": np.zeros((3, 2), dtype=float)},
+    )
+    save_to_file(
+        cached,
+        layout.datasets_dir / "dataset_0.dill",
+        use_pickle=False,
+    )
+
+    cfg = WorkflowConfig(
+        num_amortized_draws=12,
+        mcmc_backend_options={"num_samples": 4},
+        force_psis_for_all_datasets=True,
+        parallel_mode="none",
+        persist_dataset_results=True,
+        rewrite_persisted_dataset_results=True,
+    )
+    runner = WorkflowRunner(
+        task=FakeTask(),
+        approximator=FakeAmortizer(),
+        config=cfg,
+        layout=layout,
+    )
+
+    report = runner.run([np.array([0.0, 0.0]), np.array([1.0, -1.0])])
+
+    assert report.results[0].message != "cached"
+    assert calls["n"] == 2

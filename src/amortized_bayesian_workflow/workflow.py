@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
 import numpy as np
 
 from .approximators.base import AmortizedPosterior
-from .backends import SamplerRequest, get_backend
-from .backends.resolve import BackendFactory
+from .backends import get_backend, prepare_sampler_request
 from .config import ArtifactLayout, WorkflowConfig
 from .diagnostics import MahalanobisOODResult, MahalanobisReference
 from .psis import compute_psis, resample_with_weights
@@ -32,12 +30,9 @@ class WorkflowRunner:
     approximator: AmortizedPosterior
     config: WorkflowConfig
     layout: ArtifactLayout | None = None
-    backend_factories: dict[str, BackendFactory] | None = None
     diagnostic_summary_fn: Callable[[np.ndarray], np.ndarray] | None = None
 
     def __post_init__(self) -> None:
-        if self.backend_factories is None:
-            self.backend_factories = {}
         self._mahalanobis_reference: MahalanobisReference | None = None
         self._mahalanobis_ood_by_dataset: dict[int, MahalanobisOODResult] = {}
 
@@ -50,7 +45,10 @@ class WorkflowRunner:
         indexed = [(i, np.asarray(obs)) for i, obs in enumerate(observations)]
         results_by_id: dict[int, DatasetResult] = {}
 
-        if self.config.persist_dataset_results:
+        if (
+            self.config.persist_dataset_results
+            and not self.config.rewrite_persisted_dataset_results
+        ):
             results_by_id.update(self._load_saved_dataset_results())
 
         self._mahalanobis_ood_by_dataset = {}
@@ -187,7 +185,6 @@ class WorkflowRunner:
                 raise ValueError("Amortized log_prob length mismatch.")
 
             log_post_vec = self.task.vectorized_log_posterior_fn(observation)
-            log_post_single = self.task.single_log_posterior_fn(observation)
             log_target = np.asarray(log_post_vec(q_samples), dtype=float)
             if log_target.shape[0] != q_samples.shape[0]:
                 raise ValueError(
@@ -269,29 +266,19 @@ class WorkflowRunner:
             needs_mcmc = self.config.force_mcmc or psis.needs_mcmc()
             if needs_mcmc:
                 backend_name = self._resolve_mcmc_backend_name()
-                backend = get_backend(
-                    backend_name,
-                    extra_factories=self.backend_factories,
-                )
-                top_k = max(
-                    2, min(self.config.mcmc_init_top_k, q_samples.shape[0])
-                )
-                init_idx = np.argsort(-psis.smoothed_log_weights)[:top_k]
-                backend_options = self._prepare_mcmc_options(
+                backend = get_backend(backend_name)
+                mcmc_request = prepare_sampler_request(
                     backend_name=backend_name,
-                    default_num_superchains=top_k,
+                    q_samples=q_samples,
+                    log_prob_fn=log_post_vec,
+                    seed=base_seed + 3,
+                    overrides=self._mcmc_overrides_for_backend(
+                        backend_name=backend_name
+                    ),
+                    psis_log_weights=psis.smoothed_log_weights,
+                    psis_weights=psis.smoothed_normalized_weights,
                 )
-                mcmc_result = backend.run(
-                    SamplerRequest(
-                        initial_positions=q_samples[init_idx],
-                        log_prob_fn=log_post_vec,
-                        single_log_prob_fn=log_post_single,
-                        num_warmup=self.config.mcmc_warmup,
-                        num_samples=self.config.mcmc_num_samples,
-                        seed=base_seed + 2,
-                        options=backend_options,
-                    )
-                )
+                mcmc_result = backend.run(mcmc_request)
                 mcmc_draws = np.asarray(mcmc_result.draws).reshape(
                     -1, mcmc_result.draws.shape[-1]
                 )
@@ -344,9 +331,7 @@ class WorkflowRunner:
             )
 
     def _resolve_mcmc_backend_name(self) -> str:
-        sampler_name = self.config.mcmc_sampler.strip()
-        if not sampler_name and self.config.mcmc_backend is not None:
-            sampler_name = self.config.mcmc_backend
+        sampler_name = self.config.mcmc_backend
         if not sampler_name:
             sampler_name = "nuts"
 
@@ -360,46 +345,23 @@ class WorkflowRunner:
         }
         return aliases.get(normalized, normalized)
 
-    def _prepare_mcmc_options(
+    def _mcmc_overrides_for_backend(
         self,
         *,
         backend_name: str,
-        default_num_superchains: int,
     ) -> dict[str, Any]:
         options = dict(self.config.mcmc_backend_options)
-        num_superchains = int(
-            options.pop("num_superchains", default_num_superchains)
-        )
 
-        if "chees" in backend_name:
-            num_subchains = int(
-                options.pop(
-                    "num_subchains_per_superchain",
-                    options.pop("subchains_per_superchain", 1),
-                )
-            )
-            return {
-                "num_superchains": num_superchains,
-                "subchains_per_superchain": num_subchains,
-                **options,
-            }
+        backend_specific: dict[str, Any] = {}
+        for key in (backend_name, self.config.mcmc_sampler.strip().lower()):
+            value = options.pop(key, None)
+            if isinstance(value, dict):
+                backend_specific.update(value)
 
         return {
-            "num_superchains": num_superchains,
+            **backend_specific,
             **options,
         }
-
-    def _dataset_result_path(self, dataset_id: int) -> Path | None:
-        if self.layout is None:
-            return None
-        return self.layout.datasets_dir / f"dataset_{int(dataset_id)}.dill"
-
-    def _save_dataset_result(self, result: DatasetResult) -> None:
-        path = self._dataset_result_path(result.dataset_id)
-        if path is None:
-            return
-        path.parent.mkdir(parents=True, exist_ok=True)
-        save_to_file(result, path, use_pickle=False)
 
     def _load_saved_dataset_results(self) -> dict[int, DatasetResult]:
         if self.layout is None:
@@ -417,3 +379,11 @@ class WorkflowRunner:
             if isinstance(result, DatasetResult):
                 loaded[int(result.dataset_id)] = result
         return loaded
+
+    def _save_dataset_result(self, result: DatasetResult) -> None:
+        if self.layout is None:
+            return
+        datasets_dir = self.layout.datasets_dir
+        datasets_dir.mkdir(parents=True, exist_ok=True)
+        path = datasets_dir / f"dataset_{int(result.dataset_id)}.dill"
+        save_to_file(result, path, use_pickle=False)

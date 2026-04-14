@@ -23,7 +23,9 @@ class TFPCheesHMCBackend:
             opt.pop("num_superchains", request.initial_positions.shape[0])
         )
         subchains_per_superchain = int(opt.pop("subchains_per_superchain", 1))
-        init_step_size = float(opt.pop("init_step_size", 0.1))
+        init_step_size = float(
+            opt.pop("init_step_size", opt.pop("initial_step_size", 0.1))
+        )
 
         filtered = filter_initial_positions(
             request.initial_positions,
@@ -40,22 +42,21 @@ class TFPCheesHMCBackend:
             base_positions, subchains_per_superchain, axis=0
         )
 
-        target_log_prob_fn = opt.pop("target_log_prob_fn", request.log_prob_fn)
         leapfrog_steps = int(opt.pop("num_leapfrog_steps", 1))
-        total_steps = request.num_warmup + request.num_samples
+        total_steps = request.iter_warmup + request.iter_sampling
 
         kernel = tfp.mcmc.HamiltonianMonteCarlo(
-            target_log_prob_fn=target_log_prob_fn,
+            target_log_prob_fn=request.log_prob_fn,
             step_size=init_step_size,
             num_leapfrog_steps=leapfrog_steps,
         )
         kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
             inner_kernel=kernel,
-            num_adaptation_steps=request.num_warmup,
+            num_adaptation_steps=request.iter_warmup,
         )
         kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
             inner_kernel=kernel,
-            num_adaptation_steps=request.num_warmup,
+            num_adaptation_steps=request.iter_warmup,
             reduce_fn=tfp.math.reduce_log_harmonic_mean_exp,
         )
 
@@ -66,7 +67,7 @@ class TFPCheesHMCBackend:
             seed=seeds,
             trace_fn=lambda _, kernel_results: kernel_results,
         )
-        draws = np.asarray(draws_t[request.num_warmup :].swapaxes(0, 1))
+        draws = np.asarray(draws_t[request.iter_warmup :].swapaxes(0, 1))
         diagnostics = {
             **summarize_chain_convergence(
                 draws, num_superchains=num_superchains

@@ -15,32 +15,6 @@ def _to_numpy_stat(x: Any) -> np.ndarray | float:
     return arr
 
 
-def _rhat_fallback(chains: np.ndarray) -> np.ndarray | float:
-    """Compute classic split-free Gelman-Rubin R-hat for (chains, draws[, dims])."""
-    ary = np.asarray(chains, dtype=float)
-    if ary.ndim == 2:
-        ary = ary[:, :, None]
-
-    n_chains, n_draws, _ = ary.shape
-    if n_chains < 2 or n_draws < 2:
-        out = np.full(ary.shape[-1], np.nan, dtype=float)
-        return float(out[0]) if out.size == 1 else out
-
-    chain_means = np.mean(ary, axis=1)
-    # Between-chain variance B and within-chain variance W.
-    b = n_draws * np.var(chain_means, axis=0, ddof=1)
-    w = np.mean(np.var(ary, axis=1, ddof=1), axis=0)
-
-    with np.errstate(divide="ignore", invalid="ignore"):
-        var_hat = ((n_draws - 1.0) / n_draws) * w + (1.0 / n_draws) * b
-        r_hat = np.sqrt(var_hat / w)
-    r_hat = np.where(np.isfinite(r_hat), r_hat, np.nan)
-
-    if r_hat.size == 1:
-        return float(r_hat[0])
-    return r_hat
-
-
 def rhat(chains: np.ndarray) -> np.ndarray | float:
     """Compute standard R-hat on chain arrays of shape (chains, draws[, dims]).
 
@@ -52,9 +26,7 @@ def rhat(chains: np.ndarray) -> np.ndarray | float:
         raise ValueError(
             "Expected chain array with shape (chains, draws[, dims])."
         )
-    if hasattr(azs, "rhat"):
-        return _to_numpy_stat(azs.rhat(ary, chain_axis=0, draw_axis=1))
-    return _rhat_fallback(ary)
+    return _to_numpy_stat(azs.rhat(ary, chain_axis=0, draw_axis=1))
 
 
 def rhat_nested(
@@ -85,19 +57,16 @@ def rhat_nested(
         )
     else:
         superchain_ids = np.asarray(superchain_ids)
-
-    try:
-        return _to_numpy_stat(
-            azs.rhat_nested(
-                ary,
-                superchain_ids=superchain_ids.tolist(),
-                chain_axis=0,
-                draw_axis=1,
-            )
-        )
-    except Exception:
-        # Keep a compatibility bridge for nested R-hat if arviz_stats API changes.
-        return _nested_rhat_fallback(ary, superchains_id=superchain_ids)
+    return _nested_rhat_fallback(ary, superchains_id=superchain_ids)
+    # We can use the following when arviz_stats.rhat_nested works as expected, but it now restricts the number of draws to be at least 4, which is not always the case in our experiments. https://github.com/arviz-devs/arviz-stats/issues/354
+    # return _to_numpy_stat(
+    #     azs.rhat_nested(
+    #         ary,
+    #         superchain_ids=superchain_ids.tolist(),
+    #         chain_axis=0,
+    #         draw_axis=1,
+    #     )
+    # )
 
 
 def summarize_chain_convergence(
@@ -105,15 +74,12 @@ def summarize_chain_convergence(
     *,
     num_superchains: int | None = None,
 ) -> dict[str, np.ndarray | float]:
-    """Return standard R-hat and (when meaningful) nested R-hat diagnostics."""
+    """Return (nested) R-hat diagnostics."""
     ary = np.asarray(chains)
-    out: dict[str, np.ndarray | float] = {"rhat": rhat(ary)}
+    out: dict[str, np.ndarray | float] = {}
     if num_superchains is not None and 1 < num_superchains < ary.shape[0]:
-        try:
-            out["nested_rhat"] = rhat_nested(
-                ary, num_superchains=num_superchains
-            )
-        except Exception:
-            # Keep standard rhat even if nested rhat is not available.
-            pass
+        out["nested_rhat"] = rhat_nested(ary, num_superchains=num_superchains)
+    else:
+        out["rhat"] = rhat(ary)
+
     return out

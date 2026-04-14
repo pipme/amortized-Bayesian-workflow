@@ -7,6 +7,7 @@ import numpy as np
 
 from ..diagnostics import summarize_chain_convergence
 from .base import SamplerRequest, SamplerResult
+from .utils import filter_initial_positions
 
 
 class BlackJAXNUTSBackend:
@@ -15,24 +16,24 @@ class BlackJAXNUTSBackend:
     name = "blackjax_nuts"
 
     def run(self, request: SamplerRequest) -> SamplerResult:
-        if request.single_log_prob_fn is not None:
-            logdensity_fn = request.single_log_prob_fn
-        else:
-
-            def logdensity_fn(theta):
-                arr = np.asarray(theta)[None, :]
-                return request.log_prob_fn(arr)[0]
-
-        chains = np.asarray(request.initial_positions, dtype=float)
-        if chains.ndim != 2:
+        if request.initial_positions.ndim != 2:
             raise ValueError(
                 "initial_positions must have shape (num_chains, dim)."
             )
 
         opt = dict(request.options)
-        num_superchains = int(opt.pop("num_superchains", chains.shape[0]))
+        num_chains = int(opt.pop("num_chains", 1))
         store_warmup_state = bool(opt.pop("store_warmup_state", False))
         target_accept = float(opt.pop("target_accept", 0.8))
+
+        filtered = filter_initial_positions(
+            request.initial_positions,
+            request.log_prob_fn,
+        )
+        chains = filtered.positions[:num_chains]
+
+        if filtered.positions.shape[0] < num_chains:
+            raise ValueError("Not enough valid unique initial positions.")
 
         draws = []
         accept_rates = []
@@ -41,12 +42,11 @@ class BlackJAXNUTSBackend:
         for chain_id, init in enumerate(chains):
             key = jax.random.PRNGKey(request.seed + chain_id)
             chain_draws, accept_rate, warm_state = self._run_single_chain(
-                blackjax=blackjax,
-                logdensity_fn=logdensity_fn,
+                logdensity_fn=request.log_prob_fn,
                 init_position=jnp.asarray(init),
                 key=key,
-                num_warmup=request.num_warmup,
-                num_samples=request.num_samples,
+                iter_warmup=request.iter_warmup,
+                iter_sampling=request.iter_sampling,
                 target_accept=target_accept,
             )
             draws.append(np.asarray(chain_draws))
@@ -58,8 +58,8 @@ class BlackJAXNUTSBackend:
         diagnostics = {
             **summarize_chain_convergence(
                 stacked,
-                num_superchains=num_superchains
-                if 1 < num_superchains < stacked.shape[0]
+                num_superchains=num_chains
+                if 1 < num_chains < stacked.shape[0]
                 else None,
             ),
             "accept_rate_mean": float(np.mean(accept_rates)),
@@ -81,8 +81,8 @@ class BlackJAXNUTSBackend:
         logdensity_fn,
         init_position,
         key,
-        num_warmup: int,
-        num_samples: int,
+        iter_warmup: int,
+        iter_sampling: int,
         target_accept: float,
     ):
         adapt = blackjax.window_adaptation(
@@ -94,11 +94,10 @@ class BlackJAXNUTSBackend:
         warmup_key, sample_key = jax.random.split(key)
         state, kernel = self._run_warmup(
             adapt,
-            blackjax=blackjax,
             logdensity_fn=logdensity_fn,
             key=warmup_key,
             init_position=init_position,
-            num_warmup=num_warmup,
+            iter_warmup=iter_warmup,
         )
 
         def one_step(carry, rng_key):
@@ -115,7 +114,7 @@ class BlackJAXNUTSBackend:
                 acc_prob = is_acc
             return state, (pos, acc_prob)
 
-        keys = jax.random.split(sample_key, int(num_samples))
+        keys = jax.random.split(sample_key, int(iter_sampling))
         _, (positions, acc) = jax.lax.scan(one_step, state, keys)
         accept_rate = jnp.mean(jnp.asarray(acc, dtype=jnp.float32))
         return positions, accept_rate, state
@@ -124,13 +123,12 @@ class BlackJAXNUTSBackend:
         self,
         adapt,
         *,
-        blackjax,
         logdensity_fn,
         key,
         init_position,
-        num_warmup: int,
+        iter_warmup: int,
     ):
-        out = adapt.run(key, init_position, num_steps=int(num_warmup))
+        out = adapt.run(key, init_position, num_steps=int(iter_warmup))
 
         # Handle common BlackJAX API variants.
         if isinstance(out, tuple) and len(out) == 2:
@@ -138,9 +136,7 @@ class BlackJAXNUTSBackend:
             # Variant A: ((state, parameters), adaptation_info)
             if isinstance(first, tuple) and len(first) == 2:
                 state, params = first
-                kernel = self._build_nuts_kernel(
-                    blackjax, logdensity_fn, params
-                )
+                kernel = self._build_nuts_kernel(logdensity_fn, params)
                 return state, kernel
             # Variant B: (AdaptationResults(state, parameters, kernel), info)
             state = getattr(first, "state", None)
@@ -149,14 +145,12 @@ class BlackJAXNUTSBackend:
             if state is not None and kernel is not None:
                 return state, kernel
             if state is not None and params is not None:
-                kernel = self._build_nuts_kernel(
-                    blackjax, logdensity_fn, params
-                )
+                kernel = self._build_nuts_kernel(logdensity_fn, params)
                 return state, kernel
 
         raise RuntimeError("Unsupported BlackJAX warmup output format.")
 
-    def _build_nuts_kernel(self, blackjax, logdensity_fn, params):
+    def _build_nuts_kernel(self, logdensity_fn, params):
         try:
             if isinstance(params, dict):
                 return blackjax.nuts(logdensity_fn, **params)

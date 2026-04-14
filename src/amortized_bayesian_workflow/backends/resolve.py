@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Callable, Mapping
 
 from .base import SamplerBackend
 
-BackendFactory = Callable[[], SamplerBackend]
 
-
-def _default_backend_factories() -> dict[str, BackendFactory]:
+def _default_backend_factories() -> dict[str, object]:
     return {
         "blackjax_chees_hmc": lambda: getattr(
             import_module(".blackjax_chees_hmc", __package__),
@@ -27,12 +24,8 @@ def _default_backend_factories() -> dict[str, BackendFactory]:
 
 def get_backend(
     name: str,
-    *,
-    extra_factories: Mapping[str, BackendFactory] | None = None,
 ) -> SamplerBackend:
     factories = _default_backend_factories()
-    if extra_factories:
-        factories.update(dict(extra_factories))
 
     if name not in factories:
         available = ", ".join(sorted(factories)) or "<none>"
