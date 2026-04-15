@@ -98,7 +98,7 @@ Start here if you are new to the package:
 2. **Real task example (GEV + PyMC + BayesFlow 2.0.8)**  
    Open `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/examples/gev_bayesflow_2_0_8_demo.ipynb`
 3. **Fine control / debugging notebook (step-by-step pipeline)**  
-   Open `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/examples/workflow_step_by_step_debug.ipynb`
+   Open `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/examples/workflow_step_by_step.ipynb`
 4. **Complete `JAXTask` example script**  
    Run `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/examples/jax_task_complete_example.py`
 5. **Complete `PyMCTask` example script**  
@@ -267,7 +267,7 @@ task = PyMCTask.from_model_builder(
 
 - GEV (ported from `code-submission`): `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/examples/gev_bayesflow_2_0_8_demo.ipynb`
 - Task factory: `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/src/amortized_bayesian_workflow/tasks/examples/gev.py`
-- Step-by-step debugging notebook (training -> amortized draws -> diagnostics -> PSIS -> MCMC): `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/examples/workflow_step_by_step_debug.ipynb`
+- Step-by-step debugging notebook (training -> amortized draws -> diagnostics -> PSIS -> MCMC): `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/examples/workflow_step_by_step.ipynb`
 
 ## Local Workflow (Recommended)
 
