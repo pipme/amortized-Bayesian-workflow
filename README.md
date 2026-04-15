@@ -23,7 +23,7 @@ This design keeps the package easier to maintain and easier to understand for no
 The `main` branch now provides a clean foundation for incremental migration:
 
 - A typed package layout under `src/amortized_bayesian_workflow`
-- A minimal workflow orchestrator (`WorkflowRunner`) + result objects (`WorkflowReport`)
+- A minimal workflow orchestrator (`InferenceRunner`) + result objects (`WorkflowReport`)
 - A backend plugin interface for MCMC samplers (optional, internal to workflow execution)
 - Optional backends for:
   - `tfp_chees_hmc` (compatibility backend; implemented)
@@ -124,7 +124,7 @@ Use the package in two layers:
    - Train `ContinuousApproximator`
 2. **ABW layer (workflow execution)**
    - Wrap the trained BayesFlow approximator with `BayesFlowAmortizedPosterior`
-   - Run `WorkflowRunner.run(...)`
+   - Run `InferenceRunner.run(...)`
    - Inspect statuses / diagnostics / failures
    - Retry difficult datasets if needed
 
@@ -139,14 +139,14 @@ python examples/pymc_task_complete_example.py
 
 Both scripts demonstrate:
 - defining a task (`JAXTask` or `PyMCTask`)
-- fitting/running `WorkflowRunner` sequentially (default path)
+- fitting/running `InferenceRunner` sequentially (default path)
 - inspecting per-dataset status and diagnostics
 - retrying failed datasets with updated config
 
 ## Quickstart shape (notebook-friendly)
 
 ```python
-from amortized_bayesian_workflow import WorkflowConfig, WorkflowRunner
+from amortized_bayesian_workflow import InferenceConfig, InferenceRunner
 from amortized_bayesian_workflow.tasks import JAXTask
 
 # Define a task (JAX simulator + log prior + log likelihood)
@@ -155,10 +155,10 @@ task = JAXTask(...)
 # Wrap a trained BayesFlow approximator (or any object implementing sample_and_log_prob)
 amortizer = ...
 
-workflow = WorkflowRunner(
+workflow = InferenceRunner(
     task=task,
     approximator=amortizer,
-    config=WorkflowConfig(),
+    config=InferenceConfig(),
     # optional: handcrafted summary statistics for Mahalanobis OOD diagnostics
     # diagnostic_summary_fn=lambda observations: my_summary_fn(observations),
 )
@@ -211,12 +211,12 @@ Default behavior:
 
 Advanced override:
 - You can pass handcrafted summary statistics directly with
-  `WorkflowRunner(..., diagnostic_summary_fn=...)`.
+  `InferenceRunner(..., diagnostic_summary_fn=...)`.
 
 By default, datasets in the right `alpha=0.05` tail are flagged and sent to PSIS/MCMC.
 
 ```python
-config = WorkflowConfig(
+config = InferenceConfig(
     mahalanobis_alpha=0.05,             # default
     force_psis_for_all_datasets=False,  # default
 )
@@ -226,7 +226,7 @@ If you want to send every dataset to PSIS (i.e., reject amortized draws for all 
 set:
 
 ```python
-config = WorkflowConfig(force_psis_for_all_datasets=True)
+config = InferenceConfig(force_psis_for_all_datasets=True)
 ```
 
 Caution:
@@ -285,8 +285,8 @@ This keeps the workflow simple and reproducible while preserving a clear path to
 
 Most users only need:
 
-- `WorkflowRunner`
-- `WorkflowConfig`
+- `InferenceRunner`
+- `InferenceConfig`
 - `WorkflowReport`
 - `JAXTask` or `PyMCTask`
 - `BayesFlowAmortizedPosterior`
@@ -305,7 +305,7 @@ For HPC/SLURM users, minimal templates are provided under:
 - `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/scripts/slurm/merge_results.py`
 - `/Users/lichengk/project_results/amortized_bayesian_workflow/code-release/examples/factories.py` (copy/edit this first)
 
-These are thin wrappers around the same core API (`WorkflowRunner.run(...)`) and are intentionally kept outside the main package surface.
+These are thin wrappers around the same core API (`InferenceRunner.run(...)`) and are intentionally kept outside the main package surface.
 
 Important:
 - Keep `parallel_mode=\"none\"` inside each SLURM array task.

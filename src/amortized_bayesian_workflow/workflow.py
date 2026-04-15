@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 
 from .approximators.base import AmortizedPosterior
 from .backends import get_backend, prepare_sampler_request
-from .config import ArtifactLayout, WorkflowConfig
+from .config import ArtifactLayout, InferenceConfig
 from .diagnostics import MahalanobisOODResult, MahalanobisReference
 from .psis import compute_psis, resample_with_weights
 from .report import DatasetResult, WorkflowReport
@@ -17,7 +17,7 @@ from .utils import map_parallel, read_from_file, save_to_file
 
 
 @dataclass
-class WorkflowRunner:
+class InferenceRunner:
     """User-facing end-to-end amortized Bayesian workflow.
 
     The runner supports:
@@ -29,7 +29,7 @@ class WorkflowRunner:
 
     task: WorkflowTask
     approximator: AmortizedPosterior
-    config: WorkflowConfig
+    config: InferenceConfig
     layout: ArtifactLayout | None = None
 
     def __post_init__(self) -> None:
@@ -151,7 +151,7 @@ class WorkflowRunner:
 
         original_config = self.config
         if config_override:
-            self.config = WorkflowConfig(
+            self.config = InferenceConfig(
                 **(asdict(self.config) | dict(config_override))
             )
         try:

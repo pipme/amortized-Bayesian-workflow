@@ -5,10 +5,10 @@ from dataclasses import dataclass
 import numpy as np
 
 from amortized_bayesian_workflow.backends.base import SamplerResult
-from amortized_bayesian_workflow.config import WorkflowConfig
+from amortized_bayesian_workflow.config import InferenceConfig
 from amortized_bayesian_workflow.report import DatasetResult
 from amortized_bayesian_workflow.tasks.base import TaskMetadata
-from amortized_bayesian_workflow.workflow import WorkflowRunner
+from amortized_bayesian_workflow.workflow import InferenceRunner
 
 
 class FakeTask:
@@ -134,8 +134,8 @@ def make_fake_chees_backend() -> FakeCheesBackend:
 
 
 def test_workflow_fit_uses_simulator_data():
-    runner = WorkflowRunner(
-        task=FakeTask(), approximator=FakeAmortizer(), config=WorkflowConfig()
+    runner = InferenceRunner(
+        task=FakeTask(), approximator=FakeAmortizer(), config=InferenceConfig()
     )
     out = runner.amortized_training()
     assert out["train_n"] == runner.config.num_train_simulations
@@ -159,13 +159,13 @@ def test_workflow_run_psis_only(monkeypatch):
 
     monkeypatch.setattr(wf_mod, "compute_psis", fake_compute_psis)
 
-    cfg = WorkflowConfig(
+    cfg = InferenceConfig(
         num_amortized_draws=20,
         mcmc_backend_options={"num_samples": 10},
         force_psis_for_all_datasets=True,
         parallel_mode="none",
     )
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=FakeTask(), approximator=FakeAmortizer(), config=cfg
     )
     report = runner.run([np.array([0.0, 0.0]), np.array([1.0, -1.0])])
@@ -206,14 +206,14 @@ def test_workflow_run_triggers_mcmc_and_retry_failed(monkeypatch):
     monkeypatch.setattr(wf_mod, "get_backend", fake_get_backend)
     monkeypatch.setattr(backends_mod, "get_backend", fake_get_backend)
 
-    cfg = WorkflowConfig(
+    cfg = InferenceConfig(
         num_amortized_draws=16,
         mcmc_backend_options={"num_samples": 5, "num_warmup": 10},
         mcmc_sampler="fake_mcmc",
         force_psis_for_all_datasets=True,
         parallel_mode="none",
     )
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=FakeTask(),
         approximator=FakeAmortizer(),
         config=cfg,
@@ -261,13 +261,13 @@ def test_workflow_batch_mahalanobis_only_sends_ood_to_psis(monkeypatch):
 
     monkeypatch.setattr(wf_mod, "compute_psis", fake_compute_psis)
 
-    cfg = WorkflowConfig(
+    cfg = InferenceConfig(
         num_amortized_draws=30,
         mcmc_backend_options={"num_samples": 8},
         parallel_mode="none",
         mahalanobis_alpha=0.05,
     )
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=FakeTask(),
         approximator=FakeAmortizer(),
         config=cfg,
@@ -307,7 +307,7 @@ def test_workflow_mcmc_sampler_alias_and_chees_options(monkeypatch):
     monkeypatch.setattr(wf_mod, "get_backend", fake_get_backend)
     monkeypatch.setattr(backends_mod, "get_backend", fake_get_backend)
 
-    cfg = WorkflowConfig(
+    cfg = InferenceConfig(
         num_amortized_draws=16,
         mcmc_sampler="chees_hmc",
         mcmc_backend_options={
@@ -319,7 +319,7 @@ def test_workflow_mcmc_sampler_alias_and_chees_options(monkeypatch):
         force_psis_for_all_datasets=True,
         parallel_mode="none",
     )
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=FakeTask(),
         approximator=FakeAmortizer(),
         config=cfg,
@@ -356,13 +356,13 @@ def test_psis_weighted_posterior_draws_are_resampled_not_raw(monkeypatch):
 
     monkeypatch.setattr(wf_mod, "compute_psis", fake_compute_psis)
 
-    cfg = WorkflowConfig(
+    cfg = InferenceConfig(
         num_amortized_draws=20,
         mcmc_backend_options={"num_samples": 5},
         force_psis_for_all_datasets=True,
         parallel_mode="none",
     )
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=FakeTask(), approximator=FakeAmortizer(), config=cfg
     )
 
@@ -393,13 +393,13 @@ def test_workflow_report_save_and_load_roundtrip(tmp_path, monkeypatch):
 
     monkeypatch.setattr(wf_mod, "compute_psis", fake_compute_psis)
 
-    cfg = WorkflowConfig(
+    cfg = InferenceConfig(
         num_amortized_draws=10,
         mcmc_backend_options={"num_samples": 4},
         force_psis_for_all_datasets=True,
         parallel_mode="none",
     )
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=FakeTask(), approximator=FakeAmortizer(), config=cfg
     )
     report = runner.run([np.array([0.0, 0.0])])
@@ -445,7 +445,7 @@ def test_workflow_persists_dataset_results_incrementally(
 
     monkeypatch.setattr(wf_mod, "compute_psis", fake_compute_psis)
 
-    cfg = WorkflowConfig(
+    cfg = InferenceConfig(
         num_amortized_draws=12,
         mcmc_backend_options={"num_samples": 4},
         force_psis_for_all_datasets=True,
@@ -453,7 +453,7 @@ def test_workflow_persists_dataset_results_incrementally(
         persist_dataset_results=True,
     )
     layout = ArtifactLayout(root=tmp_path, task_name="fake", run_name="r1")
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=FakeTask(),
         approximator=FakeAmortizer(),
         config=cfg,
@@ -504,14 +504,14 @@ def test_workflow_reuses_saved_dataset_results(tmp_path, monkeypatch):
         use_pickle=False,
     )
 
-    cfg = WorkflowConfig(
+    cfg = InferenceConfig(
         num_amortized_draws=12,
         mcmc_backend_options={"num_samples": 4},
         force_psis_for_all_datasets=True,
         parallel_mode="none",
         persist_dataset_results=True,
     )
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=FakeTask(),
         approximator=FakeAmortizer(),
         config=cfg,
@@ -563,7 +563,7 @@ def test_workflow_rewrites_saved_dataset_results_when_enabled(
         use_pickle=False,
     )
 
-    cfg = WorkflowConfig(
+    cfg = InferenceConfig(
         num_amortized_draws=12,
         mcmc_backend_options={"num_samples": 4},
         force_psis_for_all_datasets=True,
@@ -571,7 +571,7 @@ def test_workflow_rewrites_saved_dataset_results_when_enabled(
         persist_dataset_results=True,
         rewrite_persisted_dataset_results=True,
     )
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=FakeTask(),
         approximator=FakeAmortizer(),
         config=cfg,

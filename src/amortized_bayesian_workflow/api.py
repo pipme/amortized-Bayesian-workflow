@@ -4,9 +4,9 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from .config import ArtifactLayout, WorkflowConfig
+from .config import ArtifactLayout, InferenceConfig
 from .report import WorkflowReport
-from .workflow import WorkflowRunner
+from .workflow import InferenceRunner
 
 
 def run_workflow(
@@ -14,7 +14,7 @@ def run_workflow(
     task,
     approximator,
     observations: Sequence[np.ndarray],
-    config: WorkflowConfig | None = None,
+    config: InferenceConfig | None = None,
     fit: bool = False,
     layout: ArtifactLayout | None = None,
 ) -> WorkflowReport:
@@ -24,10 +24,10 @@ def run_workflow(
     (e.g. `BayesFlowAmortizedPosterior`), and a batch of observed datasets.
     """
 
-    runner = WorkflowRunner(
+    runner = InferenceRunner(
         task=task,
         approximator=approximator,
-        config=config or WorkflowConfig(),
+        config=config or InferenceConfig(),
         layout=layout,
     )
     if fit:
@@ -37,7 +37,7 @@ def run_workflow(
 
 def retry_failed_datasets(
     *,
-    runner: WorkflowRunner,
+    runner: InferenceRunner,
     report: WorkflowReport,
     observations: Sequence[np.ndarray],
     config_override: dict[str, Any] | None = None,

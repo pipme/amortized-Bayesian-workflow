@@ -48,7 +48,7 @@ class ArtifactLayout:
 
 
 @dataclass(frozen=True)
-class WorkflowConfig:
+class InferenceConfig:
     """High-level workflow settings independent of a specific backend."""
 
     num_amortized_draws: int = 2000

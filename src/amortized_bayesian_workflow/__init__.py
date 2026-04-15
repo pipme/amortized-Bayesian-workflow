@@ -24,16 +24,16 @@ except (TypeError, ValueError):
 
 if TYPE_CHECKING:
     from .api import retry_failed_datasets, run_workflow
-    from .config import ArtifactLayout, WorkflowConfig
+    from .config import ArtifactLayout, InferenceConfig
     from .report import DatasetResult, WorkflowReport
-    from .workflow import WorkflowRunner
+    from .workflow import InferenceRunner
 
 __all__ = [
     "ArtifactLayout",
     "DatasetResult",
-    "WorkflowConfig",
+    "InferenceConfig",
     "WorkflowReport",
-    "WorkflowRunner",
+    "InferenceRunner",
     "configure_logging",
     "run_workflow",
     "retry_failed_datasets",
@@ -42,7 +42,7 @@ __version__ = "0.1.0"
 
 
 def __getattr__(name: str):
-    if name in {"ArtifactLayout", "WorkflowConfig"}:
+    if name in {"ArtifactLayout", "InferenceConfig"}:
         mod = import_module(".config", __name__)
         return getattr(mod, name)
     if name == "configure_logging":
@@ -51,7 +51,7 @@ def __getattr__(name: str):
     if name in {"DatasetResult", "WorkflowReport"}:
         mod = import_module(".report", __name__)
         return getattr(mod, name)
-    if name == "WorkflowRunner":
+    if name == "InferenceRunner":
         mod = import_module(".workflow", __name__)
         return getattr(mod, name)
     if name in {"run_workflow", "retry_failed_datasets"}:

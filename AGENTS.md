@@ -19,6 +19,7 @@ Before implementing:
 - No "flexibility" or "configurability" that wasn't requested.
 - No error handling for impossible scenarios.
 - No unnecessary fallbacks or edge cases. If a package is required, require it - don't add a fallback that adds complexity.
+- No need to consider backward compatibility unless explicitly requested.
 - If you write 200 lines and it could be 50, rewrite it.
 
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
@@ -60,9 +61,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## Architecture
 - This repository is a thin workflow layer around BayesFlow. Keep core orchestration inside `src/amortized_bayesian_workflow` and avoid duplicating BayesFlow internals.
 - Central entry points:
-	- `src/amortized_bayesian_workflow/workflow.py` (`WorkflowRunner`) for end-to-end execution.
+	- `src/amortized_bayesian_workflow/workflow.py` (`InferenceRunner`) for end-to-end execution.
 	- `src/amortized_bayesian_workflow/report.py` (`WorkflowReport`, `DatasetResult`) for result aggregation.
-	- `src/amortized_bayesian_workflow/config.py` (`WorkflowConfig`) for runtime behavior.
+	- `src/amortized_bayesian_workflow/config.py` (`InferenceConfig`) for runtime behavior.
 - Use protocol-oriented extension points:
 	- Tasks implement the `WorkflowTask` protocol (`src/amortized_bayesian_workflow/tasks/base.py`).
 	- Amortizers implement the `AmortizedPosterior` protocol (`src/amortized_bayesian_workflow/approximators/base.py`).

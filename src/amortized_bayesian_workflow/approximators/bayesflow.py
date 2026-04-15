@@ -34,7 +34,7 @@ class BayesFlowAmortizedPosterior:
     def store_training_summaries(self, observables: np.ndarray) -> None:
         """Compute and cache learned summary features for Mahalanobis OOD calibration.
 
-        Call once after training so WorkflowRunner can use pre-computed summaries
+        Call once after training so InferenceRunner can use pre-computed summaries
         instead of re-simulating reference data.
         """
         self.training_summaries = self.summary_statistics(
