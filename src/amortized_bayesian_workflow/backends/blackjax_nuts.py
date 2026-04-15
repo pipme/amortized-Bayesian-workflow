@@ -39,6 +39,7 @@ class BlackJAXNUTSBackend:
         accept_rates = []
         warmup_states = []
 
+        # Sequential loop over chains is suboptimal and just for demonstration. For better performance, consider parallelizing chains -- see https://blackjax-devs.github.io/blackjax/examples/howto_sample_multiple_chains.html for details. Or consider using NumPyro's efficient NUTS implementation which supports parallel chains out of the box.
         for chain_id, init in enumerate(chains):
             key = jax.random.PRNGKey(request.seed + chain_id)
             chain_draws, accept_rate, warm_state = self._run_single_chain(

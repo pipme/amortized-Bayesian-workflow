@@ -24,15 +24,12 @@ class PsychometricTask(PyMCTask):
         stimulus_intensities = stimulus_intensities / 100.0
         self.stimulus_intensities = stimulus_intensities
         self.n_stimuli = len(stimulus_intensities)
-        var_dims = {"mu_": 1, "sigma": 1, "gamma": 1, "lambd": 1}
         task_name = "psychometric_curve"
         self.task_info_dir = (
             Path(__file__).parent.absolute() / f"info/{task_name}"
         )
         self.overdispersion = overdispersion
         if self.overdispersion:
-            # Add overdispersion parameter
-            var_dims["nu"] = 1
             task_name += "_overdispersion"
 
         if observed_responses is None:
@@ -135,15 +132,27 @@ class PsychometricTask(PyMCTask):
     ):
         n_samples_per_chunk = kwargs.get("n_samples_per_chunk", 100)
         n_samples_per_chunk = min(n_samples_per_chunk, batch_size)
+        base_seed = kwargs.pop("seed", None)
         # print(n_samples_per_chunk)
         # Vary the number of trials every n samples
         n_chunk = batch_size // n_samples_per_chunk
+        if base_seed is None:
+            chunk_seeds = [None] * n_chunk
+        else:
+            seed_sequence = np.random.SeedSequence(base_seed)
+            chunk_seeds = [
+                int(s.generate_state(1)[0])
+                for s in seed_sequence.spawn(n_chunk)
+            ]
         simulations_list = []
         for i in range(n_chunk):
             if i == n_chunk - 1:
                 n_samples_per_chunk = batch_size - i * n_samples_per_chunk
             simulations = self.sample_with_n_trials(
-                n_samples_per_chunk, numpy, **kwargs
+                n_samples_per_chunk,
+                numpy,
+                seed=chunk_seeds[i],
+                **kwargs,
             )
             simulations_list.append(simulations)
 

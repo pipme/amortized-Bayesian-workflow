@@ -138,7 +138,11 @@ def corner_plot(
         overplot_lines(fig, point_plot, color="r")
 
     lgd = fig.legend(
-        labels=labels, loc="upper center", bbox_to_anchor=(0.8, 0.6)
+        labels=labels,
+        loc="upper right",
+        bbox_to_anchor=(0.98, 0.98),  # optional fine-tuning
+        bbox_transform=fig.transFigure,  # keeps anchor in figure coords
+        borderaxespad=0.0,
     )
     fig.suptitle(title, fontsize=20)
     fig.tight_layout()

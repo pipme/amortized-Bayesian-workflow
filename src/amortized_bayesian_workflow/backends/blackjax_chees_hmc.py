@@ -87,12 +87,13 @@ class BlackJAXCheesHMCBackend:
                 accept = getattr(info, "acceptance_probability", 1.0)
             return new_states, (positions, jnp.asarray(accept))
 
-        sample_keys = jax.random.split(sample_key, int(request.iter_sampling))
-        final_states, (positions_t, accept_t) = jax.lax.scan(
-            one_step,
-            states,
-            sample_keys,
+        # JIT the sampling loop to avoid Python overhead across many iterations.
+        run_sampling = jax.jit(
+            lambda init_states, keys: jax.lax.scan(one_step, init_states, keys)
         )
+
+        sample_keys = jax.random.split(sample_key, int(request.iter_sampling))
+        final_states, (positions_t, accept_t) = run_sampling(states, sample_keys)
 
         draws = np.asarray(jnp.swapaxes(positions_t, 0, 1))
         accept_t = jnp.asarray(accept_t)

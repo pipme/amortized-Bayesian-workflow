@@ -24,7 +24,7 @@ blackjax = ["blackjax>=1.2.0"]
 tfp = ["tensorflow-probability[jax]>=0.24"]
 pymc = ["pymc>=5.10", "arviz>=0.16"]
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.8"]
-all = ["amortized-bayesian-workflow[bayesflow,blackjax,tfp,pymc,dev]"]
+all = ["amortized-bayesian-workflow[bayesflow,blackjax,pymc,dev]"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }

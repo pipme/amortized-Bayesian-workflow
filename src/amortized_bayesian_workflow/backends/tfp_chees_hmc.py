@@ -12,7 +12,7 @@ from .utils import filter_initial_positions
 class TFPCheesHMCBackend:
     """Optional TFP/JAX ChEES-HMC backend.
 
-    Intended as a compatibility backend while BlackJAX support matures.
+    Intended as a compatibility backend which may be more robust than BlackJAX's implementation.
     """
 
     name = "tfp_chees_hmc"
