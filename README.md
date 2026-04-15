@@ -42,23 +42,29 @@ The `main` branch now provides a clean foundation for incremental migration:
 
 ## Installation
 
-Base package (includes JAX, which the workflow relies on):
+Recommended one-line install (includes BayesFlow, optional backends, and dev tools):
+
+```bash
+pip install -e '.[all]'
+```
+
+Minimal install and then add extras as needed:
 
 ```bash
 pip install -e .
 ```
 
-With BayesFlow:
+## Run Locally
+
+Clone, create the environment, install once, and open the tutorial notebook:
 
 ```bash
-pip install -e '.[bayesflow]'
-```
-
-With optional MCMC backends:
-
-```bash
-pip install -e '.[blackjax]'
-pip install -e '.[tfp]'
+git clone https://github.com/pipme/amortized-Bayesian-workflow.git
+cd amortized-Bayesian-workflow
+conda create -n abw python=3.11 -y
+conda activate abw
+pip install -e '.[all]'
+jupyter lab examples/workflow_step_by_step.ipynb
 ```
 
 ## Logging Configuration

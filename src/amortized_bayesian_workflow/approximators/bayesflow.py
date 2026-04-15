@@ -15,12 +15,6 @@ from .base import AmortizedDraws
 class BayesFlowAmortizedPosterior:
     """Thin wrapper between a trained BayesFlow ContinuousApproximator and the
     ABW inference runner.
-
-    Delegates to BayesFlow's high-level `sample`, `log_prob`, and `summarize`
-    methods, which correctly handle the full adapter + summary network pipeline
-    and the change-of-variables term from standardization. Samples and log
-    probabilities are returned in the parameter space
-    which is consistent with what the task's log posterior expects.
     """
 
     approximator: ContinuousApproximator
@@ -32,7 +26,7 @@ class BayesFlowAmortizedPosterior:
     _TRAINING_SUMMARIES_FILENAME: ClassVar[str] = "training_summaries.npy"
 
     def store_training_summaries(self, observables: np.ndarray) -> None:
-        """Compute and cache learned summary features for Mahalanobis OOD calibration.
+        """Compute and cache learned summary statistics of the training data.
 
         Call once after training so InferenceRunner can use pre-computed summaries
         instead of re-simulating reference data.
@@ -42,10 +36,9 @@ class BayesFlowAmortizedPosterior:
         )
 
     def summary_statistics(self, observations: np.ndarray) -> np.ndarray:
-        """Combined inference conditions used for Mahalanobis OOD diagnostics.
-
+        """
         Produces the full feature vector that feeds the inference network,
-        meaning the OOD check operates in the same feature space as the inference network.
+        meaning the OOD check in Inference phase (Step 1) operates in the same feature space as the inference network.
         """
         import keras
 
@@ -56,27 +49,6 @@ class BayesFlowAmortizedPosterior:
         resolved_conditions, adapted, summary_outputs = (
             self.approximator._prepare_conditions({self.observable_key: obs})
         )
-        # summary_variables = data.get("summary_variables")
-        # inference_conditions = data.get("inference_conditions")
-
-        # if self.approximator.summary_network is not None:
-        #     if summary_variables is None:
-        #         raise ValueError(
-        #             "BayesFlow adapter did not produce summary_variables."
-        #         )
-        #     summary_outputs = self.approximator.summary_network(
-        #         summary_variables
-        #     )
-        #     if inference_conditions is None:
-        #         inference_conditions = summary_outputs
-        #     else:
-        #         inference_conditions = keras.ops.concatenate(
-        #             [inference_conditions, summary_outputs], axis=-1
-        #         )
-
-        # if inference_conditions is None:
-        #     return obs.reshape(obs.shape[0], -1)
-
         return keras.ops.convert_to_numpy(resolved_conditions)
 
     def sample_and_log_prob(
@@ -88,22 +60,15 @@ class BayesFlowAmortizedPosterior:
     ) -> AmortizedDraws:
         obs = np.asarray(observation)
 
-        # approximator.sample handles adapter + summary network + inverse
-        # standardization, returning samples in the original parameter space.
-        # Shape per key: (1, num_samples, param_dim) for one condition.
         samples_dict = self.approximator.sample(
             num_samples=num_samples,
             conditions={self.observable_key: obs[None, ...]},
             seed=seed,
         )
-        # Concatenate all parameter groups (axis=-1) in deterministic key order.
         samples = np.concatenate(
             [v[0] for v in samples_dict.values()], axis=-1
         )
 
-        # approximator.log_prob handles adapter + summary network + the
-        # change-of-variables correction for standardization, returning log q
-        # in the original parameter space — matching log_p from the task.
         obs_batch = np.repeat(obs[None, ...], num_samples, axis=0)
         log_prob = self.approximator.log_prob(
             {
