@@ -66,6 +66,8 @@ class InferenceConfig:
 
     persist_dataset_results: bool = False
     rewrite_persisted_dataset_results: bool = False
-    parallel_workers: int | None = None
-    parallel_mode: str = "none"
+
+    parallel_workers: int | None = None  # experimental
+    parallel_mode: str = "none"  # experimental
+
     seed: int = 0
