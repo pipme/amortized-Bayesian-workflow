@@ -7796,7 +7796,7 @@ a.anchor-link {
 <!-- End of mermaid configuration --></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=35ad9f55">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=e4fc5a69">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -7805,12 +7805,39 @@ a.anchor-link {
 <h1 id="Tutorial-Notebook">Tutorial Notebook<a class="anchor-link" href="#Tutorial-Notebook">¶</a></h1><p>This notebook is a practical walk-through for the <a href="https://openreview.net/forum?id=osV7adJlKD">amortized Bayesian workflow</a>. The core idea of the workflow is: train one amortized posterior estimator/surrogate once, then reuse it across many datasets and escalate to more expensive but accurate methods (Pareto-smoothed importance sampling, MCMC sampling) when diagnostics require it. With this approach we can achieve efficiency gains while maintaining high posterior quality.</p>
 <p>In brief, the main steps are:</p>
 <ul>
-<li>Training phase: train an amortized estimator and validate it with simulated data.</li>
-<li>Inference phase (Step 1): fast amortized draws for real data + out-of-distribution (OOD) diagnostic for flagging datasets where the amortized draws may be unreliable</li>
+<li>Training phase: train an amortized estimator and validate it with simulated datasets.</li>
+<li>Inference phase (Step 1): fast amortized draws for real datasets + out-of-distribution (OOD) diagnostic for flagging datasets where the amortized draws may be unreliable</li>
 <li>Inference phase (Step 2): Pareto-smoothing importance sampling correction + Pareto-$\hat{k}$ diagnostic</li>
-<li>Inference phase (Step 3): MCMC sampling with amortized initializations</li>
+<li>Inference phase (Step 3): MCMC sampling with amortized initializations + R-hat convergence diagnostic</li>
 </ul>
 <p>This notebook goes through each step from training to inference and allows you to inspect intermediate outputs and reuse the same pattern for your own tasks.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=d94cf724">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="k">if</span> <span class="s2">"google.colab"</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">:</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">check_call</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span>
+            <span class="s2">"-m"</span><span class="p">,</span>
+            <span class="s2">"pip"</span><span class="p">,</span>
+            <span class="s2">"install"</span><span class="p">,</span>
+            <span class="s2">"git+https://github.com/pipme/amortized-Bayesian-workflow.git#egg=amortized-bayesian-workflow[all]"</span><span class="p">,</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+<span class="c1"># Local clone alternative: pip install -e '.[all]'</span>
+</pre></div>
+</div>
 </div>
 </div>
 </div>
@@ -7863,7 +7890,7 @@ a.anchor-link {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="Training-phase:-train-an-amortized-estimator">Training phase: train an amortized estimator<a class="anchor-link" href="#Training-phase:-train-an-amortized-estimator">¶</a></h2><p>An amortized posterior estimator takes in observed data and outputs an approximation to the posterior distribution. It can be trained with simulated data from the probabilistic model (prior predictive distribution), which is also known as <strong>simulation-based inference (SBI)</strong> in the literature. Here we use <a href="https://github.com/bayesflow-org/bayesflow">BayesFlow</a> package for this purpose, which provide convenient APIs for building, training and validating amortized estimators.</p>
+<h2 id="Training-phase:-train-an-amortized-estimator">Training phase: train an amortized estimator<a class="anchor-link" href="#Training-phase:-train-an-amortized-estimator">¶</a></h2><p>An amortized posterior estimator takes in an observed data and outputs an approximation to the posterior distribution. It can be trained with simulated parameter and data pairs from the probabilistic model (prior predictive distribution), which is also known as <strong>simulation-based inference (SBI)</strong> in the literature. Here we use <a href="https://github.com/bayesflow-org/bayesflow">BayesFlow</a> package for this purpose, which provide convenient APIs for building, training and validating amortized estimators.</p>
 </div>
 </div>
 </div>
@@ -7914,7 +7941,7 @@ a.anchor-link {
 <span class="kn">from</span><span class="w"> </span><span class="nn">bayesflow.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">plots</span> <span class="k">as</span> <span class="n">bf_plots</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">keras</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">amortized_bayesian_workflow.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_from_file</span><span class="p">,</span> <span class="n">save_to_file</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">amortized_bayesian_workflow.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_from_file</span>
 
 <span class="n">num_train_simulations</span> <span class="o">=</span> <span class="mi">10000</span>
 <span class="n">num_validation_simulations</span> <span class="o">=</span> <span class="mi">500</span>
@@ -7929,10 +7956,6 @@ a.anchor-link {
     <span class="n">num_validation_simulations</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span> <span class="o">+</span> <span class="mi">1</span>
 <span class="p">)</span>
 <span class="n">diagnostic_sims</span> <span class="o">=</span> <span class="n">task</span><span class="o">.</span><span class="n">simulate_prior_predictive</span><span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span>
-
-<span class="c1"># train_sims = read_from_file(layout.datasets_dir / "training_dataset.pkl")</span>
-<span class="c1"># val_sims = read_from_file(layout.datasets_dir / "val_dataset.pkl")</span>
-<span class="c1"># diagnostic_sims = read_from_file(layout.datasets_dir / "diagnostic_dataset.pkl")</span>
 </pre></div>
 </div>
 </div>
@@ -7956,17 +7979,6 @@ a.anchor-link {
 <span class="n">inference_network</span> <span class="o">=</span> <span class="n">bf</span><span class="o">.</span><span class="n">networks</span><span class="o">.</span><span class="n">CouplingFlow</span><span class="p">()</span>
 <span class="n">summary_network</span> <span class="o">=</span> <span class="n">bf</span><span class="o">.</span><span class="n">networks</span><span class="o">.</span><span class="n">DeepSet</span><span class="p">()</span>
 
-<span class="c1"># initial_learning_rate = 5e-4</span>
-<span class="c1"># num_batches = int(np.ceil(num_train_simulations / batch_size))</span>
-<span class="c1"># learning_rate = keras.optimizers.schedules.CosineDecay(</span>
-<span class="c1">#     initial_learning_rate=0.5 * initial_learning_rate,</span>
-<span class="c1">#     warmup_target=initial_learning_rate,</span>
-<span class="c1">#     warmup_steps=num_batches,</span>
-<span class="c1">#     decay_steps=epochs * num_batches,</span>
-<span class="c1">#     alpha=0,</span>
-<span class="c1"># )</span>
-
-<span class="c1"># optimizer = keras.optimizers.Adam(learning_rate, clipnorm=1.5)</span>
 <span class="n">basic_amortized_workflow</span> <span class="o">=</span> <span class="n">BasicWorkflow</span><span class="p">(</span>
     <span class="n">adapter</span><span class="o">=</span><span class="n">adapter</span><span class="p">,</span>
     <span class="n">inference_network</span><span class="o">=</span><span class="n">inference_network</span><span class="p">,</span>
@@ -7974,9 +7986,7 @@ a.anchor-link {
     <span class="n">checkpoint_filepath</span><span class="o">=</span><span class="n">layout</span><span class="o">.</span><span class="n">models_dir</span><span class="p">,</span>
     <span class="n">checkpoint_name</span><span class="o">=</span><span class="s2">"best_model"</span><span class="p">,</span>
     <span class="n">save_best_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="c1"># optimizer=optimizer,</span>
 <span class="p">)</span>
-<span class="c1"># basic_amortized_workflow.approximator.compile(optimizer=optimizer)</span>
 
 
 <span class="n">history</span> <span class="o">=</span> <span class="n">basic_amortized_workflow</span><span class="o">.</span><span class="n">fit_offline</span><span class="p">(</span>
@@ -8369,7 +8379,8 @@ a.anchor-link {
 <span class="nb">print</span><span class="p">(</span>
     <span class="sa">f</span><span class="s2">"""MCMC backend used: </span><span class="si">{</span><span class="n">mcmc_result</span><span class="o">.</span><span class="n">backend</span><span class="si">}</span>
 <span class="s2">MCMC draws shape: </span><span class="si">{</span><span class="n">mcmc_result</span><span class="o">.</span><span class="n">draws</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span>
-<span class="si">{</span><span class="n">mcmc_result</span><span class="o">.</span><span class="n">rhat_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">mcmc_result</span><span class="o">.</span><span class="n">diagnostics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mcmc_result</span><span class="o">.</span><span class="n">rhat_name</span><span class="p">)</span><span class="si">}</span><span class="s2">"""</span>
+<span class="si">{</span><span class="n">mcmc_result</span><span class="o">.</span><span class="n">rhat_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">mcmc_result</span><span class="o">.</span><span class="n">diagnostics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mcmc_result</span><span class="o">.</span><span class="n">rhat_name</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">Convergence:</span><span class="si">{</span><span class="n">mcmc_result</span><span class="o">.</span><span class="n">is_converged</span><span class="p">(</span><span class="n">threshold</span><span class="o">=</span><span class="mf">1.01</span><span class="p">)</span><span class="si">}</span><span class="s2">"""</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -8433,7 +8444,7 @@ a.anchor-link {
     <span class="n">BayesFlowAmortizedPosterior</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="n">task</span> <span class="o">=</span> <span class="n">PsychometricTask</span><span class="p">()</span>
+<span class="n">task</span> <span class="o">=</span> <span class="n">PsychometricTask</span><span class="p">(</span><span class="n">overdispersion</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">layout</span> <span class="o">=</span> <span class="n">ArtifactLayout</span><span class="p">(</span>
     <span class="n">root</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">"./artifacts"</span><span class="p">),</span>
     <span class="n">task_name</span><span class="o">=</span><span class="n">task</span><span class="o">.</span><span class="n">task_name</span><span class="p">,</span>
@@ -8448,9 +8459,23 @@ a.anchor-link {
 <span class="n">runner</span> <span class="o">=</span> <span class="n">InferenceRunner</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="n">task</span><span class="p">,</span> <span class="n">approximator</span><span class="o">=</span><span class="n">approximator</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
 
 
-<span class="n">test_observations</span> <span class="o">=</span> <span class="n">read_from_file</span><span class="p">(</span><span class="n">task</span><span class="o">.</span><span class="n">task_info_dir</span> <span class="o">/</span> <span class="s2">"test_dataset.pkl"</span><span class="p">)[:</span><span class="mi">3</span><span class="p">]</span>
+<span class="n">test_observations</span> <span class="o">=</span> <span class="n">read_from_file</span><span class="p">(</span><span class="n">task</span><span class="o">.</span><span class="n">task_info_dir</span> <span class="o">/</span> <span class="s2">"test_dataset.pkl"</span><span class="p">)[:</span><span class="mi">2</span><span class="p">]</span>
 <span class="n">report</span> <span class="o">=</span> <span class="n">runner</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">test_observations</span><span class="p">)</span>
 <span class="n">report</span><span class="o">.</span><span class="n">summary_table</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=f832dc02">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">ood_indices</span>
 </pre></div>
 </div>
 </div>
@@ -8463,6 +8488,7 @@ a.anchor-link {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<hr/>
 <h2 id="Citation">Citation<a class="anchor-link" href="#Citation">¶</a></h2><p>LI, C., Vehtari, A., Bürkner, P.-C., Radev, S. T., Acerbi, L., &amp; Schmitt, M. (2026). Amortized Bayesian workflow. Transactions on Machine Learning Research.</p>
 <h3 id="BibTeX">BibTeX<a class="anchor-link" href="#BibTeX">¶</a></h3><div class="highlight"><pre><span></span><span class="nc">@article</span><span class="p">{</span><span class="nl">liAmortizedBayesianWorkflow2026</span><span class="p">,</span>
 <span class="w">  </span><span class="na">title</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">{Amortized {{Bayesian}} Workflow}</span><span class="p">,</span>
