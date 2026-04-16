@@ -10,16 +10,16 @@ EXECUTE_NOTEBOOK=0
 
 usage() {
   cat <<'EOF'
-Usage: website/publish_website.sh [options]
+Usage: publish_website.sh [options]
 
 Builds website assets on gh-pages, commits changes, and pushes gh-pages.
 
 Options:
   --skip-build        Do not run website/build_notebook_site.sh
   --no-commit         Do not create a commit before publishing
-  --execute-notebook  Execute notebook during build (default)
+  --execute-notebook  Execute notebook during build
   --no-execute-notebook
-                     Build site without executing notebook cells
+                     Build site without executing notebook cells (default)
   --main-branch BR    Pull notebook source from this branch (default: main)
   --remote NAME       Push to this remote (default: origin)
   -h, --help          Show this help message
