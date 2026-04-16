@@ -12,6 +12,7 @@ SKIP_REBASE=0
 ALLOW_NON_WEBSITE_DIFF=0
 EXECUTE_NOTEBOOK=1
 RESET_SOURCE_TO_BASE=0
+FORCE_PUSH_AFTER_RESET=0
 
 usage() {
   cat <<'EOF'
@@ -30,6 +31,7 @@ Options:
                      Build site without executing notebook cells
   --reset-source-to-main
                      Reset source branch to origin/<base-branch> and keep only website/
+                     (rewrites branch history; script force-pushes with lease)
   --allow-non-website-diff
                      Allow differences from origin/<base-branch> outside website/
   --target-branch BR  Publish to this branch (default: gh-pages)
@@ -144,6 +146,7 @@ if [[ "$RESET_SOURCE_TO_BASE" -eq 1 ]]; then
   fi
 
   SKIP_REBASE=1
+  FORCE_PUSH_AFTER_RESET=1
 fi
 
 if [[ "$SKIP_REBASE" -eq 0 ]]; then
@@ -180,9 +183,18 @@ if [[ "$NO_COMMIT" -eq 0 ]]; then
 fi
 
 if [[ "$SKIP_SOURCE_PUSH" -eq 0 ]]; then
-  git push "$REMOTE" "$SOURCE_BRANCH"
+  if [[ "$FORCE_PUSH_AFTER_RESET" -eq 1 ]]; then
+    git push --force-with-lease "$REMOTE" "$SOURCE_BRANCH"
+  else
+    git push "$REMOTE" "$SOURCE_BRANCH"
+  fi
 fi
 
-git subtree push --prefix website "$REMOTE" "$TARGET_BRANCH"
+if [[ "$FORCE_PUSH_AFTER_RESET" -eq 1 ]]; then
+  SPLIT_COMMIT="$(git subtree split --prefix website HEAD)"
+  git push --force-with-lease "$REMOTE" "$SPLIT_COMMIT:$TARGET_BRANCH"
+else
+  git subtree push --prefix website "$REMOTE" "$TARGET_BRANCH"
+fi
 
 echo "Published website/ to ${REMOTE}/${TARGET_BRANCH} from ${SOURCE_BRANCH}"
