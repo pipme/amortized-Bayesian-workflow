@@ -60,7 +60,7 @@ class InferenceConfig:
     mcmc_backend: str = "blackjax_chees_hmc"
     mcmc_backend_options: dict[str, object] = field(
         default_factory=lambda: {
-            "rhat_threshold": 1.01,
+            "nested_rhat_threshold": 1.01,
         }
     )
 

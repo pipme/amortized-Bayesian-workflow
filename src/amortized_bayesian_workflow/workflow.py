@@ -301,7 +301,7 @@ class InferenceRunner:
                     "success"
                     if mcmc_result.is_converged(
                         threshold=self.config.mcmc_backend_options.get(
-                            "rhat_threshold", 1.01
+                            f"{mcmc_result.rhat_name}_threshold", 1.05
                         )
                     )
                     else "needs_review"

@@ -22,7 +22,7 @@ pip install -e .
 
 ## Notebook
 
-Please see [examples/workflow_step_by_step.ipynb](examples/workflow_step_by_step.ipynb) for a step-by-step demonstration of the workflow. It serves as a reusable template for new tasks and datasets.
+Please see the [tutorial notebook](https://pipme.github.io/amortized-Bayesian-workflow/#tutorial-notebook) for a step-by-step demonstration of the workflow. It serves as a reusable template for new tasks and datasets.
 
 ## Citation
 
