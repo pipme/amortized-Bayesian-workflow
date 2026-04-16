@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Amortized Bayesian Workflow combines amortized inference, PSIS, and MCMC diagnostics to deliver fast and reliable Bayesian inference across many datasets.">
+  <meta name="keywords" content="Bayesian inference, amortized inference, PSIS, MCMC, ChEES-HMC, BayesFlow">
+  <meta name="author" content="Chengkun Li, Aki Vehtari, Paul-Christian Buerkner, Stefan T. Radev, Luigi Acerbi, Marvin Schmitt">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Amortized Bayesian Workflow">
+  <meta property="og:description" content="Adaptive Bayesian workflow combining amortized inference with PSIS and MCMC diagnostics.">
+  <meta property="og:url" content="https://pipme.github.io/amortized-Bayesian-workflow/">
+  <meta property="og:image" content="https://pipme.github.io/amortized-Bayesian-workflow/static/images/figure1.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Amortized Bayesian Workflow">
+  <meta name="twitter:description" content="Adaptive Bayesian workflow combining amortized inference with PSIS and MCMC diagnostics.">
+  <meta name="citation_title" content="Amortized Bayesian Workflow">
+  <meta name="citation_author" content="Li, Chengkun">
+  <meta name="citation_author" content="Vehtari, Aki">
+  <meta name="citation_author" content="Buerkner, Paul-Christian">
+  <meta name="citation_author" content="Radev, Stefan T.">
+  <meta name="citation_author" content="Acerbi, Luigi">
+  <meta name="citation_author" content="Schmitt, Marvin">
+  <meta name="citation_publication_date" content="2026">
+  <meta name="citation_conference_title" content="Transactions on Machine Learning Research">
+  <meta name="citation_pdf_url" content="https://openreview.net/forum?id=osV7adJlKD">
+
+  <title>Amortized Bayesian Workflow | Project Page</title>
+
+  <link rel="icon" type="image/x-icon" href="static/images/favicon.ico">
+  <link rel="apple-touch-icon" href="static/images/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+</head>
+<body>
+  <button class="scroll-to-top" id="scrollToTopBtn" title="Scroll to top" aria-label="Scroll to top">
+    <i class="fas fa-chevron-up"></i>
+  </button>
+
+  <main id="main-content">
+    <section class="hero">
+      <div class="hero-body">
+        <div class="container is-max-desktop">
+          <div class="columns is-centered">
+            <div class="column has-text-centered">
+              <h1 class="title is-1 publication-title">Amortized Bayesian Workflow</h1>
+
+              <div class="is-size-5 publication-authors">
+                <span class="author-block"><a href="https://pipme.github.io/about.html" target="_blank" rel="noopener noreferrer">Chengkun Li</a><sup>1</sup>,</span>
+                <span class="author-block"><a href="https://users.aalto.fi/~ave/" target="_blank" rel="noopener noreferrer">Aki Vehtari</a><sup>2</sup>,</span>
+                <span class="author-block"><a href="https://paulbuerkner.com" target="_blank" rel="noopener noreferrer">Paul-Christian Buerkner</a><sup>3</sup>,</span>
+                <span class="author-block"><a href="https://bayesops.com/members/stefan-radev.html" target="_blank" rel="noopener noreferrer">Stefan T. Radev</a><sup>4</sup>,</span>
+                <span class="author-block"><a href="https://lacerbi.github.io/" target="_blank" rel="noopener noreferrer">Luigi Acerbi</a><sup>1</sup>,</span>
+                <span class="author-block"><a href="https://marvinschmitt.github.io" target="_blank" rel="noopener noreferrer">Marvin Schmitt</a><sup>5</sup></span>
+              </div>
+
+              <div class="is-size-6 publication-authors">
+                <span><sup>1</sup> University of Helsinki; <sup>2</sup> ELLIS Institute Finland, Aalto University; <sup>3</sup> TU Dortmund University; <sup>4</sup> Rensselaer Polytechnic Institute; <sup>5</sup> Independent Scientist</span>
+              </div>
+
+              <div class="publication-links">
+                <span class="link-block">
+                  <a href="https://openreview.net/forum?id=osV7adJlKD" target="_blank" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                    <span>Paper</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="https://github.com/pipme/amortized-Bayesian-workflow" target="_blank" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fab fa-github"></i></span>
+                    <span>Code</span>
+                  </a>
+                </span>
+                <span class="link-block">
+                  <a href="#tutorial-notebook" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fas fa-book-open"></i></span>
+                    <span>Tutorial notebook</span>
+                  </a>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section hero is-light">
+      <div class="container is-max-desktop">
+        <div class="columns is-centered has-text-centered">
+          <div class="column is-four-fifths">
+            <h2 class="title is-3">Abstract</h2>
+            <div class="content has-text-justified">
+              <p>
+                Bayesian inference often faces a trade-off between computational speed and sampling accuracy. We propose an adaptive workflow that integrates rapid amortized inference with gold-standard MCMC techniques to achieve a favorable combination of both speed and accuracy when performing inference on many observed datasets. Our approach uses principled diagnostics to guide the choice of inference method for each dataset, moving along the Pareto front from fast amortized sampling via generative neural networks to slower but guaranteed-accurate MCMC when needed. By reusing computations across steps, our workflow synergizes amortized and MCMC-based inference. We demonstrate the effectiveness of this integrated approach on several synthetic and real-world problems with tens of thousands of datasets, showing efficiency gains while maintaining high posterior quality.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container is-max-desktop">
+        <h2 class="title is-3">Figure 1: Workflow Overview</h2>
+        <figure>
+          <img src="static/images/figure1.png" alt="Amortized Bayesian workflow overview with amortized inference, PSIS, and MCMC." loading="lazy" />
+          <figcaption class="has-text-grey">Adaptive workflow integrating amortized inference, PSIS correction, and MCMC sampling for accelerating Bayesian computation.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section hero is-light" id="tutorial-notebook">
+      <div class="container is-max-desktop">
+        <h2 class="title is-3">Tutorial Notebook</h2>
+        <p class="subtitle is-6">
+          Follow a complete, reproducible walk-through of the amortized Bayesian workflow:
+          training, fast amortized inference, OOD diagnostics, PSIS correction, and MCMC sampling.
+          The embedded tutorial is generated from <strong>examples/workflow_step_by_step.ipynb</strong>. For local setup and execution details, see the
+          <a href="https://github.com/pipme/amortized-Bayesian-workflow/blob/main/README.md" target="_blank"
+            rel="noopener noreferrer">README run instructions</a>.
+        </p>
+        <p>
+          <a class="button is-dark is-rounded" href="./notebooks/workflow_step_by_step.ipynb" download="workflow_step_by_step.ipynb">Download notebook (.ipynb)</a>
+          <a class="button is-dark is-rounded" href="https://colab.research.google.com/github/pipme/amortized-Bayesian-workflow/blob/website-src/website/notebooks/workflow_step_by_step.ipynb" target="_blank" rel="noopener noreferrer">Open in Colab</a>
+        </p>
+
+        <iframe src="./notebooks/workflow_step_by_step.html" width="100%" height="760" style="border:1px solid #e5e7eb; border-radius:12px; background:#fff;"></iframe>
+      </div>
+    </section>
+
+    <section class="section" id="BibTeX">
+      <div class="container is-max-desktop content">
+        <div class="bibtex-header">
+          <h2 class="title">BibTeX</h2>
+          <button class="copy-bibtex-btn" onclick="copyCode('bibtex-code', this)" title="Copy BibTeX to clipboard">
+            <i class="fas fa-copy"></i>
+            <span class="copy-text">Copy</span>
+          </button>
+        </div>
+        <pre id="bibtex-code"><code>@article{liAmortizedBayesianWorkflow2026,
+        title = {Amortized {{Bayesian}} Workflow},
+        author = {LI, Chengkun and Vehtari, Aki and B{\"u}rkner, Paul-Christian and Radev, Stefan T. and Acerbi, Luigi and
+        Schmitt, Marvin},
+        year = 2026,
+        journal = {Transactions on Machine Learning Research}
+        }</code></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="columns is-centered">
+        <div class="column is-8">
+          <div class="content">
+            <p>
+              This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a>, adapted for the Amortized Bayesian Workflow project.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function copyCode(codeId, button) {
+      const code = document.getElementById(codeId);
+      if (!code) {
+        return;
+      }
+      const text = code.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        if (!button) {
+          return;
+        }
+        const copyText = button.querySelector('.copy-text');
+        if (!copyText) {
+          return;
+        }
+        const old = copyText.textContent;
+        copyText.textContent = 'Copied';
+        setTimeout(() => {
+          copyText.textContent = old;
+        }, 1000);
+      }).catch(() => {});
+    }
+
+    const scrollButton = document.getElementById('scrollToTopBtn');
+    if (scrollButton) {
+      scrollButton.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      window.addEventListener('scroll', () => {
+        if (window.pageYOffset > 300) {
+          scrollButton.classList.add('visible');
+        } else {
+          scrollButton.classList.remove('visible');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
