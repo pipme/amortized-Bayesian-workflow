@@ -33,8 +33,8 @@ class InferenceRunner:
     layout: ArtifactLayout | None = None
 
     def __post_init__(self) -> None:
-        self._mahalanobis_reference: MahalanobisReference | None = None
-        self._mahalanobis_ood_by_dataset: dict[int, MahalanobisOODResult] = {}
+        self.mahalanobis_reference: MahalanobisReference | None = None
+        self.mahalanobis_ood_by_dataset: dict[int, MahalanobisOODResult] = {}
 
     def prepare(self) -> None:
         if self.layout is not None:
@@ -51,20 +51,20 @@ class InferenceRunner:
         ):
             results_by_id.update(self._load_saved_dataset_results())
 
-        self._mahalanobis_ood_by_dataset = {}
+        self.mahalanobis_ood_by_dataset = {}
         if not self.config.force_psis_for_all_datasets and len(indexed) > 0:
-            self._calibrate_mahalanobis_reference()
+            self.compute_mahalanobis_reference()
             stacked_observations = np.asarray([obs for _, obs in indexed])
-            all_summaries = self._summary_statistics(stacked_observations)
-            if self._mahalanobis_reference is None:
+            all_summaries = self.summary_statistics(stacked_observations)
+            if self.mahalanobis_reference is None:
                 raise RuntimeError(
                     "Mahalanobis reference was not initialized after calibration."
                 )
-            ood_results = self._mahalanobis_reference.evaluate_batch(
+            ood_results = self.mahalanobis_reference.evaluate_batch(
                 all_summaries,
                 alpha=self.config.mahalanobis_alpha,
             )
-            self._mahalanobis_ood_by_dataset = {
+            self.mahalanobis_ood_by_dataset = {
                 dataset_id: ood
                 for (dataset_id, _), ood in zip(indexed, ood_results)
             }
@@ -73,7 +73,7 @@ class InferenceRunner:
             (
                 dataset_id,
                 observation,
-                self._mahalanobis_ood_by_dataset.get(dataset_id),
+                self.mahalanobis_ood_by_dataset.get(dataset_id),
             )
             for dataset_id, observation in indexed
             if dataset_id not in results_by_id
@@ -108,7 +108,7 @@ class InferenceRunner:
             metadata={"task_name": self.task.metadata.name},
         )
 
-    def _summary_statistics(self, observations: np.ndarray) -> np.ndarray:
+    def summary_statistics(self, observations: np.ndarray) -> np.ndarray:
         obs = np.asarray(observations)
         summary_method = getattr(self.approximator, "summary_statistics", None)
         if callable(summary_method):
@@ -118,12 +118,12 @@ class InferenceRunner:
                 "Amortized approximator does not provide a summary_statistics method for diagnostics."
             )
 
-    def _calibrate_mahalanobis_reference(
+    def compute_mahalanobis_reference(
         self,
     ) -> MahalanobisReference | None:
         precomputed = getattr(self.approximator, "training_summaries", None)
         if precomputed is not None and np.asarray(precomputed).shape[0] >= 2:
-            self._mahalanobis_reference = (
+            self.mahalanobis_reference = (
                 MahalanobisReference.from_training_summaries(
                     np.asarray(precomputed, dtype=float)
                 )
@@ -157,7 +157,7 @@ class InferenceRunner:
         try:
             rerun_results = {}
             for dataset_id in sorted(ids):
-                precomputed_ood = self._mahalanobis_ood_by_dataset.get(
+                precomputed_ood = self.mahalanobis_ood_by_dataset.get(
                     dataset_id
                 )
                 rerun_results[dataset_id] = self._process_one_dataset(
@@ -271,7 +271,7 @@ class InferenceRunner:
                     replace=True,
                 )
 
-            needs_mcmc = self.config.force_mcmc or psis.needs_mcmc()
+            needs_mcmc = self.config.force_mcmc or not psis.is_reliable
             if needs_mcmc:
                 backend = get_backend(self.config.mcmc_backend)
                 log_post_single = self.task.single_log_posterior_fn(

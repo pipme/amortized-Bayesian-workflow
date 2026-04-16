@@ -87,9 +87,6 @@ class FakePSIS:
     num_proposal_samples: int = 1
     metadata: dict[str, float] | None = None
 
-    def needs_mcmc(self) -> bool:
-        return self.pareto_k > 0.7
-
 
 class FakeBackend:
     name = "fake_mcmc"

@@ -58,30 +58,56 @@ class BayesFlowAmortizedPosterior:
         num_samples: int,
         seed: int,
     ) -> AmortizedDraws:
-        obs = np.asarray(observation)
-
-        samples_dict = self.approximator.sample(
+        draws = self.sample_and_log_prob_batch(
+            np.asarray(observation)[None, ...],
             num_samples=num_samples,
-            conditions={self.observable_key: obs[None, ...]},
             seed=seed,
         )
-        samples = np.concatenate(
-            [v[0] for v in samples_dict.values()], axis=-1
+        return draws[0]
+
+    def sample_and_log_prob_batch(
+        self,
+        observations: np.ndarray,
+        *,
+        num_samples: int,
+        seed: int,
+    ) -> list[AmortizedDraws]:
+        obs = np.asarray(observations)
+        if obs.ndim == 1:
+            obs = obs[None, ...]
+
+        num_datasets = obs.shape[0]
+        samples_dict = self.approximator.sample(
+            num_samples=num_samples,
+            conditions={self.observable_key: obs},
+            seed=seed,
         )
 
-        obs_batch = np.repeat(obs[None, ...], num_samples, axis=0)
+        batched_samples = {k: np.asarray(v) for k, v in samples_dict.items()}
+        samples = np.concatenate(list(batched_samples.values()), axis=-1)
+
+        obs_batch = np.repeat(obs[:, None, ...], num_samples, axis=1)
+        obs_batch = obs_batch.reshape((-1, *obs.shape[1:]))
+        flat_samples = {
+            k: v.reshape((-1, *v.shape[2:]))
+            for k, v in batched_samples.items()
+        }
         log_prob = self.approximator.log_prob(
             {
                 self.observable_key: obs_batch,
-                **{k: v[0] for k, v in samples_dict.items()},
+                **flat_samples,
             }
         )
+        log_prob = np.asarray(log_prob).reshape(num_datasets, num_samples)
 
-        return AmortizedDraws(
-            samples=samples,
-            log_prob=np.asarray(log_prob).ravel(),
-            metadata={"seed": seed},
-        )
+        return [
+            AmortizedDraws(
+                samples=samples[i],
+                log_prob=log_prob[i],
+                metadata={"seed": seed, "dataset_index": i},
+            )
+            for i in range(num_datasets)
+        ]
 
     def save(self, path: str | Path) -> None:
         """Save the approximator and wrapper metadata to a directory.

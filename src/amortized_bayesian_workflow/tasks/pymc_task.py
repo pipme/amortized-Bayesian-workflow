@@ -196,7 +196,7 @@ class PyMCTask(ABC):
         )
 
     def vectorized_log_posterior_fn(self, observation: np.ndarray):
-        """Return a batched log-posterior function for the given observation."""
+        """Return a batched log-posterior function for the given observation. Batched here means that the function can take in a batch of parameter values and return a batch of log-posterior values."""
         return get_task_func(
             task=self,
             func_type="posterior",

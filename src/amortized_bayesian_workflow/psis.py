@@ -17,12 +17,13 @@ class PSISResult:
     num_proposal_samples: int
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
-    def needs_mcmc(self) -> bool:
+    @property
+    def is_reliable(self) -> bool:
         if self.num_proposal_samples >= 2000:
             threshold = 0.7
         else:
             threshold = min(1 - 1 / np.log10(self.num_proposal_samples), 0.7)
-        return (not np.isfinite(self.pareto_k)) or (self.pareto_k > threshold)
+        return np.isfinite(self.pareto_k) and (self.pareto_k <= threshold)
 
 
 def _normalize_log_weights(logw: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
