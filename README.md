@@ -12,6 +12,8 @@ Recommended (includes optional backends and dev extras):
 git clone https://github.com/pipme/amortized-Bayesian-workflow.git
 cd amortized-Bayesian-workflow
 pip install -e '.[all]'
+# For GPU support, you can use the following command instead or set up JAX with GPU correctly beforehand (https://docs.jax.dev/en/latest/installation.html):
+# pip install -e '.[all,gpu]'
 ```
 
 Minimal install and add extras as needed:

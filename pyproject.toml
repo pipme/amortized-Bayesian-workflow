@@ -26,6 +26,7 @@ bayesflow = ["bayesflow>=2.0.10"]
 blackjax = ["blackjax>=1.2.0"]
 tfp = ["tensorflow-probability[jax]>=0.24"]
 pymc = ["pymc>=5.10", "pymc-extras", "arviz>=0.16"]
+gpu = ["jax[cuda12]>=0.4.20; platform_system=='Linux'"]
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.8", "ipykernel"]
 all = ["amortized-bayesian-workflow[bayesflow,blackjax,pymc,dev]"]
 
