@@ -6,27 +6,17 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .base import TaskMetadata, WorkflowTask
     from .examples import (
-        BernoulliGLMTask,
-        GEVObservationData,
         PsychometricTask,
-        make_bernoulli_glm_task,
-        make_gev_pymc_task,
-        make_psychometric_task,
     )
     from .jax_task import JAXTask
     from .pymc_task import PyMCTask
 
 __all__ = [
-    "BernoulliGLMTask",
-    "GEVObservationData",
     "JAXTask",
+    "GeneralizedExtremeValue",
     "PsychometricTask",
     "PyMCTask",
-    "TaskMetadata",
     "WorkflowTask",
-    "make_bernoulli_glm_task",
-    "make_gev_pymc_task",
-    "make_psychometric_task",
 ]
 
 
@@ -41,12 +31,8 @@ def __getattr__(name: str):
         mod = import_module(".pymc_task", __name__)
         return getattr(mod, name)
     if name in {
-        "BernoulliGLMTask",
-        "GEVObservationData",
+        "GeneralizedExtremeValue",
         "PsychometricTask",
-        "make_bernoulli_glm_task",
-        "make_gev_pymc_task",
-        "make_psychometric_task",
     }:
         mod = import_module(".examples", __name__)
         return getattr(mod, name)
